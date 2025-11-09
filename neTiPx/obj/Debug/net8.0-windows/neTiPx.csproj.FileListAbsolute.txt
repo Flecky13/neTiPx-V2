@@ -48,3 +48,4 @@ D:\github\VisualStudio\neTiPx-V2\neTiPx\obj\Debug\net8.0-windows\refint\neTiPx.d
 D:\github\VisualStudio\neTiPx-V2\neTiPx\obj\Debug\net8.0-windows\neTiPx.pdb
 D:\github\VisualStudio\neTiPx-V2\neTiPx\obj\Debug\net8.0-windows\neTiPx.genruntimeconfig.cache
 D:\github\VisualStudio\neTiPx-V2\neTiPx\obj\Debug\net8.0-windows\ref\neTiPx.dll
+D:\github\VisualStudio\neTiPx-V2\neTiPx\obj\Debug\net8.0-windows\neTiPx.sourcelink.json
