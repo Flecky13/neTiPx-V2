@@ -1,3 +1,5 @@
+# neTiPx — Netzwerk-Info Tool (C#)
+
 neTiPx — Netzwerk-Info Tool (Visual Studio - C# - WPF)
 Kurzbeschreibung
 neTiPx ist ein kleines Windows-Tool (geschrieben in Visual Studio - C# - WPF), das ausgewählte Netzwerkadapter aus einer INI-Datei liest und deren aktuelle Informationen anzeigt. Die Anwendung zeigt unter anderem die externe IPv4-Adresse, lokale IPv4-/IPv6-Adressen, MAC-Adresse, Gateway und DNS-Server an.
@@ -19,4 +21,4 @@ Siehe LICENSE im Repository.
 
 Kontakt
 Für Fragen zur Migration oder zum Code bitte im Repo kommentieren oder mir hier kurz Bescheid geben.# neTiPx-V2
-# neTiPx — Netzwerk-Info Tool (C#)
+
