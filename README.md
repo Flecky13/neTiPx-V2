@@ -20,5 +20,5 @@ Hinweis: AdapterX muss den NetConnectionID-Namen der Adapter enthalten (z. B. "W
 Siehe LICENSE im Repository.
 
 Kontakt
-Für Fragen zur Migration oder zum Code bitte im Repo kommentieren oder mir hier kurz Bescheid geben.# neTiPx-V2
+Für Fragen zum Code bitte im Repo kommentieren oder mir hier kurz Bescheid geben.# neTiPx-V2
 
