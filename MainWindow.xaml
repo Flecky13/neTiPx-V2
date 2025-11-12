@@ -7,7 +7,7 @@
     mc:Ignorable="d"
     Title="neTiPx - Netwerk Infos"
        Height="Auto"
-       Width="280"
+       Width="320"
        WindowStyle="None"
        ResizeMode="NoResize"
        SizeToContent="Height"
@@ -128,7 +128,7 @@
                    TextAlignment="Right"
                    Margin="5"
                    Foreground="Black"
-                   Text="NIC1: n/a"/>
+                   Text="NIC1:Labels"/>
         <TextBlock x:Name="NIC1_INFOS2"
                    Grid.Column="2"
                    Grid.Row="4"
@@ -138,7 +138,7 @@
                    TextAlignment="Left"
                    Margin="5"
                    Foreground="Black"
-                   Text="NIC2: n/a"/>
+                   Text="NIC1:Values"/>
         <TextBlock x:Name="NIC2_INFOS1"
                    Grid.Column="1"
                    Grid.Row="7"
@@ -148,7 +148,7 @@
                    TextAlignment="Right"
                    Margin="5"
                    Foreground="Black"
-                   Text="NIC1: n/a"/>
+                   Text="NIC2:Labels"/>
         <TextBlock x:Name="NIC2_INFOS2"
                    Grid.Column="2"
                    Grid.Row="7"
@@ -158,6 +158,6 @@
                    TextAlignment="Left"
                    Margin="5"
                    Foreground="Black"
-                   Text="NIC2: n/a"/>
+                   Text="NIC2:Values"/>
     </Grid>
 </Window>

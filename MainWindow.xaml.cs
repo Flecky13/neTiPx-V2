@@ -108,7 +108,6 @@ namespace neTiPx
                 {
                     info2 = NetzwerkInfo.HoleNetzwerkInfo(nic2);
                 }
-
                 return (info1, info2);
             }
             catch (Exception ex)
@@ -120,43 +119,69 @@ namespace neTiPx
 
         private void SetzeNetzwerkInfosInUI((string[,]? nic1, string[,]? nic2) infos)
         {
-            // Hilfsfunktion: formatiert Bezeichnungen und Werte aus dem 2D-Arrays
             static (string labels, string values) FormatInfos(string[,]? arr)
             {
                 if (arr == null) return ("", "");
-                var rows = arr.GetLength(0);
+
                 var sbLabels = new System.Text.StringBuilder();
                 var sbValues = new System.Text.StringBuilder();
+
+                int rows = arr.GetLength(0);
+
                 for (int i = 0; i < rows; i++)
                 {
-                    var label = arr[i, 0] ?? "";
-                    var value = arr[i, 1] ?? "";
-                    // value kann mehrzeilig sein (z.B. mehrere IPv6-Adressen) -> behalten
-                    sbLabels.AppendLine(label);
-                    sbValues.AppendLine(value.Replace("\r\n", "\n"));
+                    string label = arr[i, 0] ?? "";
+                    string value = arr[i, 1] ?? "";
+
+                    // Zerlege value in einzelne Zeilen (z.B. mehrere IPv6-Adressen)
+                    var valueLines = value
+                        .Replace("\r\n", "\n")
+                        .Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+                    if (valueLines.Length == 0)
+                    {
+                        // Kein Wert -> eine leere Zeile mit Label
+                        sbLabels.AppendLine(label);
+                        sbValues.AppendLine("-");
+                    }
+                    else
+                    {
+                        // Erste Zeile: Label + erste Value
+                        sbLabels.AppendLine(label);
+                        sbValues.AppendLine(valueLines[0]);
+
+                        // Für jede weitere Value-Zeile: linke Spalte leer, rechte Spalte die zusätzliche Value
+                        for (int v = 1; v < valueLines.Length; v++)
+                        {
+                            sbLabels.AppendLine(""); // leere Zelle links
+                            sbValues.AppendLine(valueLines[v]);
+                        }
+                    }
+                    sbLabels.AppendLine(""); // leere Zelle links
+                    sbValues.AppendLine(""); // leere Zelle rechts
                 }
-                return (sbLabels.ToString().TrimEnd('\n','\r'), sbValues.ToString().TrimEnd('\n','\r'));
+
+                // Entferne das letzte Newline
+                return (sbLabels.ToString().TrimEnd('\r', '\n'), sbValues.ToString().TrimEnd('\r', '\n'));
             }
 
             var (labels1, values1) = FormatInfos(infos.nic1);
             var (labels2, values2) = FormatInfos(infos.nic2);
 
-            Debug.WriteLine($"[MainWindow] Labels 1: {labels1}  values 1 : {values1}");
-            Debug.WriteLine($"[MainWindow] Labels 2: {labels2}  values 2 : {values2}");
+            Debug.WriteLine($"[MainWindow] Labels 1:\n{labels1}\nValues 1:\n{values1}");
+            Debug.WriteLine($"[MainWindow] Labels 2:\n{labels2}\nValues 2:\n{values2}");
 
-            // Setze die Inhalte in die UI-Elemente (UI-Thread)
             Dispatcher.Invoke(() =>
             {
                 try
                 {
-                    // Adapter-Namen (falls vorhanden als erste Zeile in infos)
                     if (infos.nic1 != null && infos.nic1.GetLength(0) > 0)
                         NIC1_Name.Content = infos.nic1[0, 1] ?? NIC1_Name.Content;
 
                     if (infos.nic2 != null && infos.nic2.GetLength(0) > 0)
                         NIC2_Name.Content = infos.nic2[0, 1] ?? NIC2_Name.Content;
 
-                    // TextBlocks aktualisieren
+                    // Stelle sicher, dass die UI-Elemente TextWrapping erlauben und monospace setzen (optional)
                     NIC1_INFOS1.Text = string.IsNullOrEmpty(labels1) ? "" : labels1;
                     NIC1_INFOS2.Text = string.IsNullOrEmpty(values1) ? "" : values1;
 
@@ -169,6 +194,7 @@ namespace neTiPx
                 }
             });
         }
+
 
     }
 }

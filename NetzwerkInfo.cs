@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Management;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Management;
 
 namespace neTiPx
 {
@@ -25,71 +26,7 @@ namespace neTiPx
         {
             try
             {
-                NetworkInterface? adapter = null;
-
-                // Versuche zunächst, per NetConnectionID (WMI) das passende Interface zu finden
-                try
-                {
-                    if (!string.IsNullOrWhiteSpace(adapterName))
-                    {
-                        // WMI-Abfrage: Win32_NetworkAdapter.NetConnectionID
-                        var safeName = adapterName.Replace("'", "''");
-                        var query = $"SELECT * FROM Win32_NetworkAdapter WHERE NetConnectionID = '{safeName}'";
-                        using var searcher = new ManagementObjectSearcher(query);
-                        var results = searcher.Get();
-                        foreach (ManagementObject mo in results)
-                        {
-                            // Versuche zuerst über MAC-Adresse zu matchen
-                            var mac = (mo["MACAddress"] as string) ?? string.Empty;
-                            if (!string.IsNullOrEmpty(mac))
-                            {
-                                string normMac = mac.Replace(":", string.Empty).Replace("-", string.Empty).ToUpperInvariant();
-                                adapter = NetworkInterface.GetAllNetworkInterfaces()
-                                    .FirstOrDefault(n =>
-                                    {
-                                        var phys = n.GetPhysicalAddress();
-                                        var physStr = phys != null ? phys.ToString() : string.Empty;
-                                        return !string.IsNullOrEmpty(physStr) && physStr.Replace("-", string.Empty).ToUpperInvariant() == normMac;
-                                    });
-                                if (adapter != null)
-                                    break;
-                            }
-
-                            // Wenn MAC nicht half, versuche InterfaceIndex
-                            var idxObj = mo["InterfaceIndex"] ?? mo["Index"];
-                            if (idxObj != null && int.TryParse(idxObj.ToString(), out int idx))
-                            {
-                                adapter = NetworkInterface.GetAllNetworkInterfaces()
-                                    .FirstOrDefault(n =>
-                                    {
-                                        try
-                                        {
-                                            var ipv4Props = n.GetIPProperties().GetIPv4Properties();
-                                            return ipv4Props != null && ipv4Props.Index == idx;
-                                        }
-                                        catch
-                                        {
-                                            return false;
-                                        }
-                                    });
-                                if (adapter != null)
-                                    break;
-                            }
-                        }
-                    }
-                }
-                catch (Exception wex)
-                {
-                    Console.WriteLine($"[NetzwerkInfo] WMI-Abfrage fehlgeschlagen: {wex.Message}");
-                }
-
-                // Fallback: Suche per Interface-Name (bisheriges Verhalten)
-                if (adapter == null)
-                {
-                    adapter = NetworkInterface.GetAllNetworkInterfaces()
-                        .FirstOrDefault(a => a.Name.Equals(adapterName, StringComparison.OrdinalIgnoreCase));
-                }
-
+                NetworkInterface? adapter = FindeAdapter(adapterName);
                 if (adapter == null)
                 {
                     Console.WriteLine($"[NetzwerkInfo] Kein Adapter mit Name/NetConnectionID '{adapterName}' gefunden.");
@@ -99,52 +36,72 @@ namespace neTiPx
                 var props = adapter.GetIPProperties();
                 string[,] infos = new string[InfoNamen.Length, 2];
 
-                infos[0, 0] = "Name";
-                infos[0, 1] = adapter.Name;
+                // Fülle die Tabelle in exakter Reihenfolge
+                int index = 0;
 
-                // IPv4
-                var ipv4 = props.UnicastAddresses
-                    .FirstOrDefault(a => a.Address.AddressFamily == AddressFamily.InterNetwork)?
-                    .Address.ToString() ?? "-";
-                infos[1, 0] = "IPv4";
-                infos[1, 1] = ipv4;
+                infos[index, 0] = "Name";
+                infos[index++, 1] = adapter.Name;
 
-                // IPv6 - ALLE sammeln
-                var ipv6Adressen = props.UnicastAddresses
-                    .Where(a => a.Address.AddressFamily == AddressFamily.InterNetworkV6)
-                    .Select(a => a.Address.ToString())
-                    .ToList();
-
-                infos[2, 0] = "IPv6";
-                infos[2, 1] = ipv6Adressen.Any()
-                    ? string.Join(Environment.NewLine, ipv6Adressen)
-                    : "-";
-
-                // Gateway
-                infos[3, 0] = "Gateway";
-                infos[3, 1] = props.GatewayAddresses.FirstOrDefault()?.Address.ToString() ?? "-";
-
-                // DNS
-                var dnsList = props.DnsAddresses.Select(d => d.ToString()).ToList();
-                infos[4, 0] = "DNS1";
-                infos[4, 1] = dnsList.Count > 0 ? dnsList[0] : "-";
-
-                infos[5, 0] = "DNS2";
-                infos[5, 1] = dnsList.Count > 1 ? dnsList[1] : "-";
-
-                // MAC-Adresse
-                infos[6, 0] = "MAC";
-                infos[6, 1] = string.Join(":", adapter.GetPhysicalAddress()
+                infos[index, 0] = "MAC";
+                infos[index++, 1] = string.Join(":", adapter.GetPhysicalAddress()
                     .GetAddressBytes()
                     .Select(b => b.ToString("X2")));
 
+                // IPv4
+                var ipv4 = props.UnicastAddresses
+                    .Where(a => a.Address.AddressFamily == AddressFamily.InterNetwork)
+                    .Select(a => a.Address.ToString())
+                    .ToList();
+                infos[index, 0] = "IPv4";
+                infos[index++, 1] = ipv4.Any() ? string.Join(Environment.NewLine, ipv4) : "-";
+
+                // IPv4-Gateways
+                var gw4 = props.GatewayAddresses
+                    .Where(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
+                    .Select(g => g.Address.ToString())
+                    .ToList();
+                infos[index, 0] = "Gateway4";
+                infos[index++, 1] = gw4.Any() ? string.Join(Environment.NewLine, gw4) : "-";
+
+                // DNS4
+                var dns4 = props.DnsAddresses
+                    .Where(d => d.AddressFamily == AddressFamily.InterNetwork)
+                    .Select(d => d.ToString())
+                    .ToList();
+                infos[index, 0] = "DNS4";
+                infos[index++, 1] = dns4.Any() ? string.Join(Environment.NewLine, dns4) : "-";
+
+                // IPv6
+                var ipv6 = props.UnicastAddresses
+                    .Where(a => a.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                    .Select(a => a.Address.ToString())
+                    .ToList();
+                infos[index, 0] = "IPv6";
+                infos[index++, 1] = ipv6.Any() ? string.Join(Environment.NewLine, ipv6) : "-";
+
+                // IPv6-Gateways
+                var gw6 = props.GatewayAddresses
+                    .Where(g => g.Address.AddressFamily == AddressFamily.InterNetworkV6)
+                    .Select(g => g.Address.ToString())
+                    .ToList();
+                infos[index, 0] = "Gateway6";
+                infos[index++, 1] = gw6.Any() ? string.Join(Environment.NewLine, gw6) : "-";
+
+                // DNS6
+                var dns6 = props.DnsAddresses
+                    .Where(d => d.AddressFamily == AddressFamily.InterNetworkV6)
+                    .Select(d => d.ToString())
+                    .ToList();
+                infos[index, 0] = "DNS6";
+                infos[index++, 1] = dns6.Any() ? string.Join(Environment.NewLine, dns6) : "-";
+
                 // Debug-Ausgabe
-                Console.WriteLine($"[NetzwerkInfo] Adapter '{adapterName}' erfolgreich eingelesen:");
+                Console.WriteLine($"[NetzwerkInfo] Adapter '{adapter.Name}' erfolgreich eingelesen:");
                 for (int i = 0; i < infos.GetLength(0); i++)
                 {
-                    var label = infos[i, 0];
-                    var value = infos[i, 1]?.Replace(Environment.NewLine, " | "); // Zeilenumbruch im Log schöner darstellen
-                    Console.WriteLine($"  {label,-8}: {value}");
+                    string label = infos[i, 0];
+                    string value = infos[i, 1]?.Replace(Environment.NewLine, " | ") ?? "-";
+                    Console.WriteLine($"  {label,-10}: {value}");
                 }
 
                 return infos;
@@ -152,6 +109,42 @@ namespace neTiPx
             catch (Exception ex)
             {
                 Console.WriteLine($"[NetzwerkInfo] Fehler: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static NetworkInterface? FindeAdapter(string adapterName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(adapterName))
+                    return null;
+
+                string safeName = adapterName.Replace("'", "''");
+                var query = $"SELECT * FROM Win32_NetworkAdapter WHERE NetConnectionID = '{safeName}'";
+                using var searcher = new ManagementObjectSearcher(query);
+                var results = searcher.Get();
+
+                foreach (ManagementObject mo in results)
+                {
+                    var mac = (mo["MACAddress"] as string) ?? string.Empty;
+                    if (!string.IsNullOrEmpty(mac))
+                    {
+                        string normMac = mac.Replace(":", "").Replace("-", "").ToUpperInvariant();
+                        var adapter = NetworkInterface.GetAllNetworkInterfaces()
+                            .FirstOrDefault(n => n.GetPhysicalAddress().ToString().ToUpperInvariant() == normMac);
+                        if (adapter != null)
+                            return adapter;
+                    }
+                }
+
+                // Fallback: direkter Vergleich per Name
+                return NetworkInterface.GetAllNetworkInterfaces()
+                    .FirstOrDefault(a => a.Name.Equals(adapterName, StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[NetzwerkInfo] FindeAdapter-Fehler: {ex.Message}");
                 return null;
             }
         }
