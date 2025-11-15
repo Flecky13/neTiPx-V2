@@ -6,7 +6,7 @@ using System.Management;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
-namespace neTiPx
+namespace neTiPx 
 {
     public class NetzwerkInfo
     {
@@ -33,10 +33,33 @@ namespace neTiPx
                     return null;
                 }
 
+                // Wenn Adapter DOWN → nur Basisinfos zurückgeben
+                if (adapter.OperationalStatus != OperationalStatus.Up)
+                {
+                    Console.WriteLine($"[NetzwerkInfo] Adapter '{adapter.Name}' ist DOWN → nur Basisdaten.");
+
+                    string[,] infosDown = new string[3, 2];
+
+                    int idx = 0;
+
+                    infosDown[idx, 0] = "Name";
+                    infosDown[idx++, 1] = adapter.Name;
+
+                    infosDown[idx, 0] = "MAC";
+                    infosDown[idx++, 1] = string.Join(":", adapter.GetPhysicalAddress()
+                        .GetAddressBytes()
+                        .Select(b => b.ToString("X2")));
+
+                    infosDown[idx, 0] = "Status";
+                    infosDown[idx++, 1] = "Keine Verbindung";
+
+                    return infosDown;
+                }
+
+                // Adapter ist UP → vollständige Infos
                 var props = adapter.GetIPProperties();
                 string[,] infos = new string[InfoNamen.Length, 2];
 
-                // Fülle die Tabelle in exakter Reihenfolge
                 int index = 0;
 
                 infos[index, 0] = "Name";
@@ -55,7 +78,7 @@ namespace neTiPx
                 infos[index, 0] = "IPv4";
                 infos[index++, 1] = ipv4.Any() ? string.Join(Environment.NewLine, ipv4) : "-";
 
-                // IPv4-Gateways
+                // IPv4 Gateways
                 var gw4 = props.GatewayAddresses
                     .Where(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
                     .Select(g => g.Address.ToString())
@@ -79,7 +102,7 @@ namespace neTiPx
                 infos[index, 0] = "IPv6";
                 infos[index++, 1] = ipv6.Any() ? string.Join(Environment.NewLine, ipv6) : "-";
 
-                // IPv6-Gateways
+                // IPv6 Gateways
                 var gw6 = props.GatewayAddresses
                     .Where(g => g.Address.AddressFamily == AddressFamily.InterNetworkV6)
                     .Select(g => g.Address.ToString())
@@ -94,15 +117,6 @@ namespace neTiPx
                     .ToList();
                 infos[index, 0] = "DNS6";
                 infos[index++, 1] = dns6.Any() ? string.Join(Environment.NewLine, dns6) : "-";
-
-                // Debug-Ausgabe
-                Console.WriteLine($"[NetzwerkInfo] Adapter '{adapter.Name}' erfolgreich eingelesen:");
-                for (int i = 0; i < infos.GetLength(0); i++)
-                {
-                    string label = infos[i, 0];
-                    string value = infos[i, 1]?.Replace(Environment.NewLine, " | ") ?? "-";
-                    Console.WriteLine($"  {label,-10}: {value}");
-                }
 
                 return infos;
             }

@@ -1,26 +1,50 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+//using System.Windows.Shapes;
+
+using System.IO;
 using System.Windows.Threading;
 
 namespace neTiPx
 {
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
     public partial class MainWindow : Window
     {
+
         private readonly Internet internet = new Internet();
         private readonly DispatcherTimer timer = new DispatcherTimer();
-
         public MainWindow()
         {
             InitializeComponent();
-
             Debug.WriteLine("[MainWindow] Konstruktor initialisiert");
 
             timer.Interval = TimeSpan.FromMinutes(1);
             timer.Tick += Timer_Tick; // separate Methode
-            Debug.WriteLine("Code will run every 1 minute. Press any key to exit.");
+            Debug.WriteLine("Code will run every 1 minute. ");
+        }
+
+        public async Task UpdateWindowsAPP()
+        {
+            Debug.WriteLine("[MainWindow] UpdateWindowsAPP() aufgerufen");
+            await AktualisiereIPAsync();
+            var infos = AktualisiereNetzwerkInfos();
+            SetzeNetzwerkInfosInUI(infos);
+            timer.Start();
+            Debug.WriteLine("[MainWindow] Timer gestartet");
         }
 
         private async void Window_Loaded(object? sender, RoutedEventArgs? e)
@@ -32,8 +56,10 @@ namespace neTiPx
             timer.Start();
             Debug.WriteLine("[MainWindow] Timer gestartet");
         }
-
+        
         // Timer Tick Handler
+
+        
         private async void Timer_Tick(object? sender, EventArgs? e)
         {
             Debug.WriteLine("[MainWindow] Aktualieseiren IP-Update ausgelöst");
@@ -41,14 +67,17 @@ namespace neTiPx
             var infos = AktualisiereNetzwerkInfos();
             SetzeNetzwerkInfosInUI(infos);
         }
+        
 
         // Stoppe Timer beim Schließen des Fensters
+        
         private void Window_Closed(object? sender, EventArgs? e)
         {
             Debug.WriteLine("[MainWindow] Window_Closed -> Timer stoppen");
             timer.Tick -= Timer_Tick;
             timer.Stop();
         }
+        
 
         // Lädt die IP und aktualisiert das Label
         private async Task AktualisiereIPAsync()
@@ -59,7 +88,6 @@ namespace neTiPx
 
                 ISPInfos.Content = "Lade IP...";
                 await internet.LadeExterneIPAsync();
-
                 ISPInfos.Content = $"{internet.IPAdresse}";
                 Debug.WriteLine($"[MainWindow] IP aktualisiert: {internet.IPAdresse}");
             }

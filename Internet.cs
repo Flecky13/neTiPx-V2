@@ -5,10 +5,10 @@ using System.Threading.Tasks;
 
 namespace neTiPx
 {
-    public class Internet
-    {
+    public class Internet 
+    { 
         public string IPAdresse { get; private set; } = "Unbekannt";
-
+         
         private readonly string[] ipServices =
         {
             "https://api.ipify.org",
