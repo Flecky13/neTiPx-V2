@@ -191,16 +191,10 @@ namespace neTiPx
 
         private ContextMenuStrip CreateContextMenu()
         {
-            var openItem = new ToolStripMenuItem("Show");
-            openItem.Click += ShowItemOnClick;
-
-            var hideItem = new ToolStripMenuItem("Hide");
-            hideItem.Click += HideItemOnClick;
-
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += ExitItemOnClick;
 
-            return new ContextMenuStrip { Items = { openItem, hideItem, exitItem } };
+            return new ContextMenuStrip { Items = { exitItem } };
         }
 
         private void ShowItemOnClick(object? sender, EventArgs args)
