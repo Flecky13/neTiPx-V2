@@ -31,7 +31,7 @@ namespace neTiPx
             {
                 Debug.WriteLine($"[MainWindow] Fehler beim Abonnieren der Tray-Events: {ex.Message}");
             }
-
+            UpdateGui();
         }
 
         private void MainWindow_ContentRendered(object? sender, EventArgs e)
