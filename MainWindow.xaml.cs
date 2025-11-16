@@ -8,21 +8,30 @@ namespace neTiPx
 {
     public partial class MainWindow : Window
     {
-        private readonly Internet internet = new Internet();
-        private readonly DispatcherTimer timer = new DispatcherTimer();
+        // Internet- / Timer-Logik wurde ins ViewModel verschoben
 
         public MainWindow()
         {
             InitializeComponent();
             Debug.WriteLine("[MainWindow] Konstruktor initialisiert");
 
-            timer.Interval = TimeSpan.FromMinutes(1);
-            timer.Tick += Timer_Tick;
+            //timer.Interval = TimeSpan.FromMinutes(1);
+            //timer.Tick += Timer_Tick;
 
             // Positionierung nach Rendern
             this.ContentRendered += MainWindow_ContentRendered;
             this.SizeChanged += MainWindow_SizeChanged;
-            
+            // Direkt auf die Tray-Wrapper-Events abonnieren, damit Show/Hide auch nach Hide() funktionieren
+            try
+            {
+                TrayIcon.TrayMouseEnter += (s, e) => ShowWindowFromTray();
+                TrayIcon.TrayMouseLeave += (s, e) => HideWindowToTray();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Fehler beim Abonnieren der Tray-Events: {ex.Message}");
+            }
+
         }
 
         private void MainWindow_ContentRendered(object? sender, EventArgs e)
@@ -46,99 +55,71 @@ namespace neTiPx
             this.Top = workArea.Bottom - windowHeight - 10;
         }
 
-        public async Task UpdateWindowsAPP()
+        // Wird vom Tray-Wrapper bei Maus-Over aufgerufen
+        public void ShowWindowFromTray()
         {
-            Debug.WriteLine("[MainWindow] UpdateWindowsAPP() aufgerufen");
-            await AktualisiereIPAsync();
-            var infos = AktualisiereNetzwerkInfos();
-            SetzeNetzwerkInfosInUI(infos);
+            Debug.WriteLine("[MainWindow] ShowWindowFromTray aufgerufen");
+            Dispatcher.Invoke(async () =>
+            {
+                // Wenn das Fenster vorher verborgen war, zeigen
+                try
+                {
+                    this.Show();
+                    this.WindowState = WindowState.Normal;
+                    PositionWindowBottomRight();
 
-            timer.Start();
-            Debug.WriteLine("[MainWindow] Timer gestartet");
-
-            PositionWindowBottomRight();
+                    // Daten aktualisieren via ViewModel
+                    UpdateGui();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainWindow] Fehler in ShowWindowFromTray(): {ex.Message}");
+                }
+                this.Activate();
+            });
         }
+
+        // Wird vom Tray-Wrapper bei Maus-Leave aufgerufen
+        public void HideWindowToTray()
+        {
+            Debug.WriteLine("[MainWindow] HideWindowToTray aufgerufen");
+            Dispatcher.Invoke(() =>
+            {
+                // Komplett ausblenden
+                this.Hide();
+            });
+        }
+
+
 
         private async void Window_Loaded(object? sender, RoutedEventArgs? e)
         {
-            Debug.WriteLine("[MainWindow] Window_Loaded -> Starte erstes IP-Update");
-            await AktualisiereIPAsync();
-            var infos = AktualisiereNetzwerkInfos();
-            SetzeNetzwerkInfosInUI(infos);
-            timer.Start();
-            Debug.WriteLine("[MainWindow] Timer gestartet");
+            UpdateGui();
             PositionWindowBottomRight();
         }
 
-        private void window_Activated(object? sender, EventArgs? e)
+        public async void UpdateGui()
         {
-            PositionWindowBottomRight();
-        }
+            var vm = this.DataContext as MainWindowViewModel;
+            if (vm == null)
+                return;
 
-        private async void Timer_Tick(object? sender, EventArgs? e)
-        {
-            Debug.WriteLine("[MainWindow] Aktualieseiren IP-Update ausgelöst");
-            await AktualisiereIPAsync();
-            var infos = AktualisiereNetzwerkInfos();
+            // IP
+            Dispatcher.Invoke(() => { ISPInfos.Content = "Lade IP..."; });
+            var ip = await vm.LadeExterneIPAsync();
+            Dispatcher.Invoke(() => { ISPInfos.Content = ip ?? "Fehler beim Laden der IP"; });
+
+            // Netzwerkinfos
+            var infos = vm.HoleNetzwerkInfos();
             SetzeNetzwerkInfosInUI(infos);
         }
 
         private void Window_Closed(object? sender, EventArgs? e)
         {
-            Debug.WriteLine("[MainWindow] Window_Closed -> Timer stoppen");
-            timer.Tick -= Timer_Tick;
-            timer.Stop();
+            Debug.WriteLine("[MainWindow] Window_Closed");
         }
 
-        private async Task AktualisiereIPAsync()
-        {
-            try
-            {
-                Debug.WriteLine("[MainWindow] AktualisiereIPAsync() gestartet");
-                ISPInfos.Content = "Lade IP...";
-                await internet.LadeExterneIPAsync();
-                ISPInfos.Content = $"{internet.IPAdresse}";
-                Debug.WriteLine($"[MainWindow] IP aktualisiert: {internet.IPAdresse}");
-            }
-            catch (Exception ex)
-            {
-                ISPInfos.Content = "Fehler beim Laden der IP";
-                Debug.WriteLine($"[MainWindow] Fehler: {ex.Message}");
-            }
-        }
-
-        private (string[,]? nic1, string[,]? nic2) AktualisiereNetzwerkInfos()
-        {
-            try
-            {
-                string iniPfad = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
-                if (!System.IO.File.Exists(iniPfad))
-                {
-                    Console.WriteLine("[NetzwerkInfo] Keine INI gefunden");
-                    return (null, null);
-                }
-
-                var lines = System.IO.File.ReadAllLines(iniPfad);
-                string? nic1 = null, nic2 = null;
-                foreach (var line in lines)
-                {
-                    if (line.StartsWith("Adapter1", StringComparison.OrdinalIgnoreCase))
-                        nic1 = line.Split('=')[1].Trim();
-                    else if (line.StartsWith("Adapter2", StringComparison.OrdinalIgnoreCase))
-                        nic2 = line.Split('=')[1].Trim();
-                }
-
-                string[,]? info1 = null, info2 = null;
-                if (!string.IsNullOrEmpty(nic1)) info1 = NetzwerkInfo.HoleNetzwerkInfo(nic1);
-                if (!string.IsNullOrEmpty(nic2)) info2 = NetzwerkInfo.HoleNetzwerkInfo(nic2);
-                return (info1, info2);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[MainWindow] Netzwerk-Update-Fehler: {ex.Message}");
-                return (null, null);
-            }
-        }
+        // Netzwerk- und IP-Aktualisierung wurde ins ViewModel verschoben
 
         private void SetzeNetzwerkInfosInUI((string[,]? nic1, string[,]? nic2) infos)
         {

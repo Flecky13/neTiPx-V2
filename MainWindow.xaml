@@ -1,4 +1,5 @@
 ﻿<Window x:Class="neTiPx.MainWindow"
+    x:Name="ThisWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -22,7 +23,7 @@
         <local:MainWindowViewModel/>
     </Window.DataContext>
     <Grid>
-        <local:NotifyIconWrapper NotifyRequest="{Binding NotifyRequest}" Grid.ColumnSpan="3">
+        <local:NotifyIconWrapper x:Name="TrayIcon" NotifyRequest="{Binding NotifyRequest}" Grid.ColumnSpan="3">
             <bh:Interaction.Triggers>
                 <bh:EventTrigger EventName="HideSelected">
                     <bh:InvokeCommandAction Command="{Binding NotifyIconHideCommand}"/>

@@ -33,7 +33,8 @@ namespace neTiPx
 
         private bool _isMouseOver = false;
         private DateTime _lastMouseMove = DateTime.MinValue;
-        private bool _leaveCheckerRunning = false;
+        private readonly System.Timers.Timer? _leaveTimer;
+        private System.Drawing.Point _enterCursorPosition = new System.Drawing.Point(0, 0);
 
         // --------------------------------------------------------
 
@@ -107,7 +108,11 @@ namespace neTiPx
             // MouseOver aktivieren
             _notifyIcon.MouseMove += NotifyIcon_MouseMove;
 
-            Application.Current.Exit += (obj, args) => { _notifyIcon?.Dispose(); };
+            // Timer zur zuverlässigen Erkennung von MouseLeave
+            _leaveTimer = new System.Timers.Timer(800) { AutoReset = false };
+            _leaveTimer.Elapsed += LeaveTimer_Elapsed;
+
+            Application.Current.Exit += (obj, args) => { _notifyIcon?.Dispose(); _leaveTimer?.Dispose(); };
         }
 
         // --------------------------------------------------------
@@ -117,42 +122,69 @@ namespace neTiPx
             get => (NotifyRequestRecord)GetValue(NotifyRequestProperty);
             set => SetValue(NotifyRequestProperty, value);
         }
-        
+
         public void Dispose()
         {
             _notifyIcon?.Dispose();
+            try { _leaveTimer?.Dispose(); } catch { }
         }
-        
+
         // --------------------------------------------------------
 
         private void NotifyIcon_MouseMove(object? sender, MouseEventArgs e)
         {
             _lastMouseMove = DateTime.Now;
 
+            // Wenn erstes MouseMove -> Enter
+
             if (!_isMouseOver)
             {
                 _isMouseOver = true;
+                // speichere die Cursor-Position beim Eintritt, damit Stillstand nicht als Verlassen gewertet wird
+                try { _enterCursorPosition = System.Windows.Forms.Cursor.Position; } catch { _enterCursorPosition = new System.Drawing.Point(0,0); }
                 RaiseEvent(new RoutedEventArgs(TrayMouseEnterEvent));
-                Debug.WriteLine("[NofifyIconWrapper] MouseOver erkannt");
+                Debug.WriteLine("[NotifyIconWrapper] MouseOver erkannt");
             }
-            
-            StartLeaveChecker();
+
+            // Restart hide timer: wenn nach Interval kein MouseMove kommt, wird Leave ausgelöst
+            try
+            {
+                if (_leaveTimer != null)
+                {
+                    _leaveTimer.Stop();
+                    _leaveTimer.Start();
+                }
+            }
+            catch (ObjectDisposedException) { }
         }
 
-        private async void StartLeaveChecker()
+        private void LeaveTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
         {
-            if (_leaveCheckerRunning)
-                return;
+            // Auf UI-Thread ausführen
+            Application.Current?.Dispatcher?.BeginInvoke(new Action(() =>
+            {
+                // Sicherheitscheck: Nur auslösen, wenn sich der Cursor tatsächlich vom Eintrittspunkt wegbewegt hat.
+                var timer = _leaveTimer;
+                if (timer == null) return;
 
-            _leaveCheckerRunning = true;
-
-            while ((DateTime.Now - _lastMouseMove).TotalMilliseconds < 350)
-                await Task.Delay(2000);
-            Debug.WriteLine("[NofifyIconWrapper] MouseLeave erkannt");
-            _isMouseOver = false;
-            RaiseEvent(new RoutedEventArgs(TrayMouseLeaveEvent));
-
-            _leaveCheckerRunning = false;
+                var current = System.Windows.Forms.Cursor.Position;
+                // Distanz zum Eintrittspunkt
+                int dx = current.X - _enterCursorPosition.X;
+                int dy = current.Y - _enterCursorPosition.Y;
+                var distSq = dx * dx + dy * dy;
+                const int leaveDistancePx = 16; // wenn Cursor sich mehr als 32px entfernt hat -> Leave
+                if (distSq >= leaveDistancePx * leaveDistancePx)
+                {
+                    Debug.WriteLine("[NotifyIconWrapper] MouseLeave erkannt (Cursor bewegt)");
+                    _isMouseOver = false;
+                    RaiseEvent(new RoutedEventArgs(TrayMouseLeaveEvent));
+                }
+                else
+                {
+                    // Cursor steht noch in der Nähe des Icons -> keinen Leave auslösen, Timer neu starten
+                    try { timer.Stop(); timer.Start(); } catch (ObjectDisposedException) { }
+                }
+            }));
         }
 
         // --------------------------------------------------------
