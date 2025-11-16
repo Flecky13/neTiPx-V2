@@ -6,6 +6,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ApplicationIcon>icons\toolicon.ico</ApplicationIcon>
+    <Version>1.0.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
