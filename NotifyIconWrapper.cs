@@ -12,15 +12,37 @@ namespace neTiPx
 {
     public class NotifyIconWrapper : FrameworkElement, IDisposable
     {
-        
+        // --- MouseOver Events ---
+        private static readonly RoutedEvent TrayMouseEnterEvent = EventManager.RegisterRoutedEvent(
+            "TrayMouseEnter", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
+        private static readonly RoutedEvent TrayMouseLeaveEvent = EventManager.RegisterRoutedEvent(
+            "TrayMouseLeave", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
+        public event RoutedEventHandler TrayMouseEnter
+        {
+            add => AddHandler(TrayMouseEnterEvent, value);
+            remove => RemoveHandler(TrayMouseEnterEvent, value);
+        }
+
+        public event RoutedEventHandler TrayMouseLeave
+        {
+            add => AddHandler(TrayMouseLeaveEvent, value);
+            remove => RemoveHandler(TrayMouseLeaveEvent, value);
+        }
+
+        private bool _isMouseOver = false;
+        private DateTime _lastMouseMove = DateTime.MinValue;
+        private bool _leaveCheckerRunning = false;
+
+        // --------------------------------------------------------
+
         public static readonly DependencyProperty TextProperty =
             DependencyProperty.Register("Text", typeof(string), typeof(NotifyIconWrapper), new PropertyMetadata(
                 (d, e) =>
                 {
-                    var notifyIcon = ((NotifyIconWrapper)d)._notifyIcon;
-                    if (notifyIcon == null)
-                        return;
-                    notifyIcon.Text = (string)e.NewValue;
+                    var wrapper = (NotifyIconWrapper)d;
+                    wrapper._notifyIcon?.Text = (string)e.NewValue;
                 }));
 
         private static readonly DependencyProperty NotifyRequestProperty =
@@ -28,39 +50,67 @@ namespace neTiPx
                 new PropertyMetadata(
                     (d, e) =>
                     {
+                        var wrapper = (NotifyIconWrapper)d;
                         var r = (NotifyRequestRecord)e.NewValue;
-                        ((NotifyIconWrapper)d)._notifyIcon?.ShowBalloonTip(r.Duration, r.Title, r.Text, r.Icon);
+                        wrapper._notifyIcon?.ShowBalloonTip(r.Duration, r.Title, r.Text, r.Icon);
                     }));
-        
-        private static readonly RoutedEvent ShowSelectedEvend = EventManager.RegisterRoutedEvent("ShowSelected",
-            RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
 
-        private static readonly RoutedEvent HideSelectedEvend = EventManager.RegisterRoutedEvent("HideSelected",
-            RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+        private static readonly RoutedEvent ShowSelectedEvent = EventManager.RegisterRoutedEvent(
+            "ShowSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
 
-        private static readonly RoutedEvent ExitSelectedEvend = EventManager.RegisterRoutedEvent("ExitSelected",
-            RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+        private static readonly RoutedEvent HideSelectedEvent = EventManager.RegisterRoutedEvent(
+            "HideSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
+        private static readonly RoutedEvent ExitSelectedEvent = EventManager.RegisterRoutedEvent(
+            "ExitSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
+        public event RoutedEventHandler ShowSelected
+        {
+            add => AddHandler(ShowSelectedEvent, value);
+            remove => RemoveHandler(ShowSelectedEvent, value);
+        }
+
+        public event RoutedEventHandler HideSelected
+        {
+            add => AddHandler(HideSelectedEvent, value);
+            remove => RemoveHandler(HideSelectedEvent, value);
+        }
+
+        public event RoutedEventHandler ExitSelected
+        {
+            add => AddHandler(ExitSelectedEvent, value);
+            remove => RemoveHandler(ExitSelectedEvent, value);
+        }
+
+        // --------------------------------------------------------
 
         private readonly NotifyIcon? _notifyIcon;
 
         public NotifyIconWrapper()
         {
+            // Null-sicher im Designer
             if (DesignerProperties.GetIsInDesignMode(this))
+            {
+                _notifyIcon = null;
                 return;
+            }
+
             _notifyIcon = new NotifyIcon
             {
                 Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location),
                 Visible = true,
                 ContextMenuStrip = CreateContextMenu()
             };
+
             _notifyIcon.DoubleClick += ShowItemOnClick;
-            Application.Current.Exit += (obj, args) => { _notifyIcon.Dispose(); };
+
+            // MouseOver aktivieren
+            _notifyIcon.MouseMove += NotifyIcon_MouseMove;
+
+            Application.Current.Exit += (obj, args) => { _notifyIcon?.Dispose(); };
         }
-        public string Text
-        {
-            get => (string)GetValue(TextProperty);
-            set => SetValue(TextProperty, value);
-        }
+
+        // --------------------------------------------------------
 
         public NotifyRequestRecord NotifyRequest
         {
@@ -68,61 +118,78 @@ namespace neTiPx
             set => SetValue(NotifyRequestProperty, value);
         }
         
-
         public void Dispose()
         {
             _notifyIcon?.Dispose();
         }
+        
+        // --------------------------------------------------------
 
-        public event RoutedEventHandler ShowSelected
+        private void NotifyIcon_MouseMove(object? sender, MouseEventArgs e)
         {
-            add => AddHandler(ShowSelectedEvend, value);
-            remove => RemoveHandler(ShowSelectedEvend, value);
+            _lastMouseMove = DateTime.Now;
+
+            if (!_isMouseOver)
+            {
+                _isMouseOver = true;
+                RaiseEvent(new RoutedEventArgs(TrayMouseEnterEvent));
+                Debug.WriteLine("[NofifyIconWrapper] MouseOver erkannt");
+            }
+            
+            StartLeaveChecker();
         }
 
-        public event RoutedEventHandler HideSelected
+        private async void StartLeaveChecker()
         {
-            add => AddHandler(HideSelectedEvend, value);
-            remove => RemoveHandler(HideSelectedEvend, value);
+            if (_leaveCheckerRunning)
+                return;
+
+            _leaveCheckerRunning = true;
+
+            while ((DateTime.Now - _lastMouseMove).TotalMilliseconds < 350)
+                await Task.Delay(2000);
+            Debug.WriteLine("[NofifyIconWrapper] MouseLeave erkannt");
+            _isMouseOver = false;
+            RaiseEvent(new RoutedEventArgs(TrayMouseLeaveEvent));
+
+            _leaveCheckerRunning = false;
         }
 
-        public event RoutedEventHandler ExitSelected
-        {
-            add => AddHandler(ExitSelectedEvend, value);
-            remove => RemoveHandler(ExitSelectedEvend, value);
-        }
+        // --------------------------------------------------------
 
         private ContextMenuStrip CreateContextMenu()
         {
             var openItem = new ToolStripMenuItem("Show");
             openItem.Click += ShowItemOnClick;
+
             var hideItem = new ToolStripMenuItem("Hide");
             hideItem.Click += HideItemOnClick;
+
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += ExitItemOnClick;
-            var contextMenu = new ContextMenuStrip {Items = {openItem, hideItem, exitItem }};
-            return contextMenu;
-        }
-        private async void ShowItemOnClick(object? sender, EventArgs eventArgs)
-        {
-            Debug.WriteLine("[NotifyIconWrapper] - ShowItemOnClick ");
-            //await MainWindow.UpdateWindowsAPP();
-            var args = new RoutedEventArgs(ShowSelectedEvend);
-            RaiseEvent(args);
+
+            return new ContextMenuStrip { Items = { openItem, hideItem, exitItem } };
         }
 
-        private void HideItemOnClick(object? sender, EventArgs eventArgs)
+        private void ShowItemOnClick(object? sender, EventArgs args)
+        {
+            Debug.WriteLine("[NotifyIconWrapper] - ShowItemOnClick ");
+            RaiseEvent(new RoutedEventArgs(ShowSelectedEvent));
+        }
+
+        private void HideItemOnClick(object? sender, EventArgs args)
         {
             Debug.WriteLine("[NotifyIconWrapper] - HideItemOnClick ");
-            var args = new RoutedEventArgs(HideSelectedEvend);
-            RaiseEvent(args);
+            RaiseEvent(new RoutedEventArgs(HideSelectedEvent));
         }
-        private void ExitItemOnClick(object? sender, EventArgs eventArgs)
+
+        private void ExitItemOnClick(object? sender, EventArgs args)
         {
             Debug.WriteLine("[NotifyIconWrapper] - ExitItemOnClick ");
-            var args = new RoutedEventArgs(ExitSelectedEvend);
-            RaiseEvent(args);
+            RaiseEvent(new RoutedEventArgs(ExitSelectedEvent));
         }
+
+        // --------------------------------------------------------
 
         public class NotifyRequestRecord
         {
@@ -131,6 +198,5 @@ namespace neTiPx
             public int Duration { get; set; } = 1000;
             public ToolTipIcon Icon { get; set; } = ToolTipIcon.Info;
         }
-        
     }
 }

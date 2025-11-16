@@ -6,16 +6,18 @@
         xmlns:bh="http://schemas.microsoft.com/xaml/behaviors"
         xmlns:local="clr-namespace:neTiPx"
         mc:Ignorable="d"
-        ShowInTaskbar="{Binding ShowInTaskbar}"
+        ShowInTaskbar="False"
         WindowState="{Binding WindowState}"
         Loaded="Window_Loaded"
         Closed="Window_Closed"
         Title="neTiPx - Netwerk Infos"
         Height="Auto"
         Width="320"
+        Topmost="True"
+        WindowStartupLocation="Manual"
         WindowStyle="None"
         ResizeMode="NoResize"
-       SizeToContent="Height">
+        SizeToContent="Height">
     <Window.DataContext>
         <local:MainWindowViewModel/>
     </Window.DataContext>
@@ -30,6 +32,12 @@
                 </bh:EventTrigger>
                 <bh:EventTrigger EventName="ExitSelected">
                     <bh:InvokeCommandAction Command="{Binding NotifyIconExitCommand}"/>
+                </bh:EventTrigger>
+                <bh:EventTrigger EventName="TrayMouseEnter">
+                    <bh:InvokeCommandAction Command="{Binding NotifyIconShowCommand}" />
+                </bh:EventTrigger>
+                <bh:EventTrigger EventName="TrayMouseLeave">
+                    <bh:InvokeCommandAction Command="{Binding NotifyIconHideCommand}" />
                 </bh:EventTrigger>
             </bh:Interaction.Triggers>
         </local:NotifyIconWrapper>
@@ -181,12 +189,4 @@
                    Text="NIC2:Values"/>
         </Grid>
     </Grid>
-    <bh:Interaction.Triggers>
-        <bh:EventTrigger EventName="Loaded">
-            <bh:InvokeCommandAction Command="{Binding LoadedCommand}"/>
-        </bh:EventTrigger>
-        <bh:EventTrigger EventName="Closing">
-            <bh:InvokeCommandAction Command="{Binding ClosingCommand}" PassEventArgsToCommand="True"/>
-        </bh:EventTrigger>
-    </bh:Interaction.Triggers>
 </Window>

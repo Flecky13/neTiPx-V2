@@ -22,18 +22,30 @@ namespace neTiPx
         {
             LoadedCommand = new RelayCommand(Loaded);
             ClosingCommand = new RelayCommand<CancelEventArgs>(Closing);
-            //NotifyCommand = new RelayCommand(() => Notify("Hello world!"));
                  
-            NotifyIconShowCommand = new RelayCommand(() => { WindowState = WindowState.Normal; });
-            NotifyIconHideCommand = new RelayCommand(() => { WindowState = WindowState.Minimized; });
+            NotifyIconShowCommand = new RelayCommand(() => { WindowNormal(); });
+            NotifyIconHideCommand = new RelayCommand(() => { WindowMinimized(); });
             NotifyIconExitCommand = new RelayCommand(() => { Application.Current.Shutdown(); });
-            Debug.WriteLine("[MainWindow] Konstruktor initialisiert");
+            Debug.WriteLine("[MainWindowViewModel] Konstruktor initialisiert");
 
+        }
+
+        private void WindowNormal()
+        {
+            WindowState = WindowState.Normal;
+            
+            Debug.WriteLine("[MainWindowViewModel] WindowNormal");
+          
+        }
+        private void WindowMinimized()
+        {
+            WindowState = WindowState.Minimized;
+            
+            Debug.WriteLine("[MainWindowViewModel] WindowMinimized");
         }
 
         public ICommand LoadedCommand { get; }
         public ICommand ClosingCommand { get; }
-        //public ICommand NotifyCommand { get; }
         public ICommand NotifyIconShowCommand { get; }
         public ICommand NotifyIconExitCommand { get; }
         public ICommand NotifyIconHideCommand { get; }
@@ -61,20 +73,11 @@ namespace neTiPx
             set => SetProperty(ref _notifyRequest, value);
         }
         
-
-        private void Notify(string message)
-        {
-            NotifyRequest = new NotifyIconWrapper.NotifyRequestRecord
-            {
-                Title = "Notify",
-                Text = message,
-                Duration = 1000
-            };
-        }
         
         private void Loaded()
         {
             WindowState = WindowState.Minimized;
+            Debug.WriteLine($"[MainWindowViewModel] Loaded {WindowState}");
         }
 
         private void Closing(CancelEventArgs? e)
