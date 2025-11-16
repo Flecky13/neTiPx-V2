@@ -65,6 +65,9 @@ namespace neTiPx
         private static readonly RoutedEvent ExitSelectedEvent = EventManager.RegisterRoutedEvent(
             "ExitSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
 
+        private static readonly RoutedEvent ConfigSelectedEvent = EventManager.RegisterRoutedEvent(
+            "ConfigSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
         public event RoutedEventHandler ShowSelected
         {
             add => AddHandler(ShowSelectedEvent, value);
@@ -81,6 +84,12 @@ namespace neTiPx
         {
             add => AddHandler(ExitSelectedEvent, value);
             remove => RemoveHandler(ExitSelectedEvent, value);
+        }
+
+        public event RoutedEventHandler ConfigSelected
+        {
+            add => AddHandler(ConfigSelectedEvent, value);
+            remove => RemoveHandler(ConfigSelectedEvent, value);
         }
 
         // --------------------------------------------------------
@@ -191,10 +200,19 @@ namespace neTiPx
 
         private ContextMenuStrip CreateContextMenu()
         {
+            var configItem = new ToolStripMenuItem("Config");
+            configItem.Click += ConfigItemOnClick;
+
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += ExitItemOnClick;
 
-            return new ContextMenuStrip { Items = { exitItem } };
+            return new ContextMenuStrip { Items = { configItem, exitItem } };
+        }
+
+        private void ConfigItemOnClick(object? sender, EventArgs args)
+        {
+            Debug.WriteLine("[NotifyIconWrapper] - ConfigItemOnClick ");
+            RaiseEvent(new RoutedEventArgs(ConfigSelectedEvent));
         }
 
         private void ShowItemOnClick(object? sender, EventArgs args)
