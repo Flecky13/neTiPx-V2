@@ -43,7 +43,7 @@
                 </bh:EventTrigger>
             </bh:Interaction.Triggers>
         </local:NotifyIconWrapper>
-        <Grid>
+        <Grid x:Name="LayoutGrid">
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="RahmenOben" Height="5"></RowDefinition>
                 <RowDefinition x:Name="InfosIp" Height="25"></RowDefinition>

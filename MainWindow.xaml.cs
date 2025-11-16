@@ -26,6 +26,22 @@ namespace neTiPx
             {
                 TrayIcon.TrayMouseEnter += (s, e) => ShowWindowFromTray();
                 TrayIcon.TrayMouseLeave += (s, e) => HideWindowToTray();
+                TrayIcon.ConfigSelected += (s, e) =>
+                {
+                    try
+                    {
+                        // Verstecken und Config-Fenster öffnen
+                        this.Hide();
+                        var cfg = new ConfigWindow();
+                        cfg.Owner = this;
+                        cfg.ShowDialog();
+                        // nach Schließen: verbleiben hidden (App im Tray)
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MainWindow] Fehler beim Öffnen ConfigWindow: {ex.Message}");
+                    }
+                };
             }
             catch (Exception ex)
             {
@@ -158,12 +174,44 @@ namespace neTiPx
             Dispatcher.Invoke(() =>
             {
                 if (infos.nic1 != null && infos.nic1.GetLength(0) > 0) NIC1_Name.Content = infos.nic1[0, 1] ?? NIC1_Name.Content;
-                if (infos.nic2 != null && infos.nic2.GetLength(0) > 0) NIC2_Name.Content = infos.nic2[0, 1] ?? NIC2_Name.Content;
 
                 NIC1_INFOS1.Text = labels1;
                 NIC1_INFOS2.Text = values1;
-                NIC2_INFOS1.Text = labels2;
-                NIC2_INFOS2.Text = values2;
+
+                // NIC2: falls keine Infos vorhanden sind, komplette Sektion ausblenden
+                bool hasNic2 = infos.nic2 != null && infos.nic2.GetLength(0) > 0;
+                if (hasNic2)
+                {
+                    NIC2_Name.Visibility = Visibility.Visible;
+                    NIC2_INFOS1.Visibility = Visibility.Visible;
+                    NIC2_INFOS2.Visibility = Visibility.Visible;
+
+                    NIC2_Name.Content = infos.nic2[0, 1] ?? NIC2_Name.Content;
+                    NIC2_INFOS1.Text = labels2;
+                    NIC2_INFOS2.Text = values2;
+
+                    // Restore row sizes for separator, header and infos
+                    if (LayoutGrid != null && LayoutGrid.RowDefinitions.Count > 7)
+                    {
+                        LayoutGrid.RowDefinitions[5].Height = new GridLength(5);
+                        LayoutGrid.RowDefinitions[6].Height = new GridLength(25);
+                        LayoutGrid.RowDefinitions[7].Height = GridLength.Auto;
+                    }
+                }
+                else
+                {
+                    // Keine zweite NIC: ausblenden und RowHeights auf 0 setzen
+                    NIC2_Name.Visibility = Visibility.Collapsed;
+                    NIC2_INFOS1.Visibility = Visibility.Collapsed;
+                    NIC2_INFOS2.Visibility = Visibility.Collapsed;
+
+                    if (LayoutGrid != null && LayoutGrid.RowDefinitions.Count > 7)
+                    {
+                        LayoutGrid.RowDefinitions[5].Height = new GridLength(0);
+                        LayoutGrid.RowDefinitions[6].Height = new GridLength(0);
+                        LayoutGrid.RowDefinitions[7].Height = new GridLength(0);
+                    }
+                }
             });
         }
     }
