@@ -68,6 +68,9 @@ namespace neTiPx
         private static readonly RoutedEvent ConfigSelectedEvent = EventManager.RegisterRoutedEvent(
             "ConfigSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
 
+        private static readonly RoutedEvent IpSettingsSelectedEvent = EventManager.RegisterRoutedEvent(
+            "IpSettingsSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
         public event RoutedEventHandler ShowSelected
         {
             add => AddHandler(ShowSelectedEvent, value);
@@ -90,6 +93,12 @@ namespace neTiPx
         {
             add => AddHandler(ConfigSelectedEvent, value);
             remove => RemoveHandler(ConfigSelectedEvent, value);
+        }
+
+        public event RoutedEventHandler IpSettingsSelected
+        {
+            add => AddHandler(IpSettingsSelectedEvent, value);
+            remove => RemoveHandler(IpSettingsSelectedEvent, value);
         }
 
         // --------------------------------------------------------
@@ -203,16 +212,25 @@ namespace neTiPx
             var configItem = new ToolStripMenuItem("Config");
             configItem.Click += ConfigItemOnClick;
 
+            var ipItem = new ToolStripMenuItem("IP Settings");
+            ipItem.Click += IpItemOnClick;
+
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += ExitItemOnClick;
 
-            return new ContextMenuStrip { Items = { configItem, exitItem } };
+            return new ContextMenuStrip { Items = { configItem, ipItem, exitItem } };
         }
 
         private void ConfigItemOnClick(object? sender, EventArgs args)
         {
             Debug.WriteLine("[NotifyIconWrapper] - ConfigItemOnClick ");
             RaiseEvent(new RoutedEventArgs(ConfigSelectedEvent));
+        }
+
+        private void IpItemOnClick(object? sender, EventArgs args)
+        {
+            Debug.WriteLine("[NotifyIconWrapper] - IpItemOnClick ");
+            RaiseEvent(new RoutedEventArgs(IpSettingsSelectedEvent));
         }
 
         private void ShowItemOnClick(object? sender, EventArgs args)

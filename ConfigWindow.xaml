@@ -1,21 +1,46 @@
 <Window x:Class="neTiPx.ConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Config" Height="350" Width="400" WindowStartupLocation="CenterScreen">
+        Title="Config" Height="420" Width="520" WindowStartupLocation="CenterScreen">
     <Grid Margin="8">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Text="Wähle bis zu 2 physische Netzwerkadapter:" FontWeight="Bold" />
+        <TabControl x:Name="TabControlMain" Grid.Row="0">
+            <TabItem Header="Adapter Auswahl">
+                <Grid Margin="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Wähle bis zu 2 physische Netzwerkadapter:" FontWeight="Bold" />
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,8">
+                        <StackPanel x:Name="AdaptersPanel" />
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,8">
-            <StackPanel x:Name="AdaptersPanel" />
-        </ScrollViewer>
+            <TabItem Header="IP Settings">
+                <Grid Margin="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button x:Name="BtnAddIpTab" Width="100" Margin="2" Click="BtnAddIpTab_Click">Neuer IP-Tab</Button>
+                        <Button x:Name="BtnRemoveIpTab" Width="100" Margin="2" Click="BtnRemoveIpTab_Click">Tab löschen</Button>
+                        <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(max. 10)</TextBlock>
+                    </StackPanel>
+
+                    <TabControl x:Name="IpTabsControl" Grid.Row="1" />
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="BtnSave" Width="80" Margin="4" Click="BtnSave_Click">Speichern</Button>
             <Button x:Name="BtnCancel" Width="80" Margin="4" Click="BtnCancel_Click">Abbrechen</Button>
         </StackPanel>

@@ -42,6 +42,23 @@ namespace neTiPx
                         Debug.WriteLine($"[MainWindow] Fehler beim Öffnen ConfigWindow: {ex.Message}");
                     }
                 };
+                TrayIcon.IpSettingsSelected += (s, e) =>
+                {
+                    try
+                    {
+                        // Verstecken und Config-Fenster öffnen direkt auf IP-Tab
+                        this.Hide();
+                        var cfg = new ConfigWindow();
+                        cfg.Owner = this;
+                        // select IP tab if possible
+                        try { cfg.GetType().GetMethod("SelectIpTab")?.Invoke(cfg, null); } catch { }
+                        cfg.ShowDialog();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MainWindow] Fehler beim Öffnen ConfigWindow (IP Settings): {ex.Message}");
+                    }
+                };
             }
             catch (Exception ex)
             {
@@ -171,22 +188,32 @@ namespace neTiPx
             var (labels1, values1) = FormatInfos(infos.nic1);
             var (labels2, values2) = FormatInfos(infos.nic2);
 
+            // Capture display names / nullables before entering the lambda to satisfy nullable analysis
+            string? nic1Title = null;
+            if (infos.nic1 != null && infos.nic1.GetLength(0) > 0) nic1Title = infos.nic1[0, 1];
+
+            string? nic2Title = null;
+            bool hasNic2 = false;
+            if (infos.nic2 != null && infos.nic2.GetLength(0) > 0)
+            {
+                hasNic2 = true;
+                nic2Title = infos.nic2[0, 1];
+            }
+
             Dispatcher.Invoke(() =>
             {
-                if (infos.nic1 != null && infos.nic1.GetLength(0) > 0) NIC1_Name.Content = infos.nic1[0, 1] ?? NIC1_Name.Content;
+                if (!string.IsNullOrEmpty(nic1Title)) NIC1_Name.Content = nic1Title;
 
                 NIC1_INFOS1.Text = labels1;
                 NIC1_INFOS2.Text = values1;
 
-                // NIC2: falls keine Infos vorhanden sind, komplette Sektion ausblenden
-                bool hasNic2 = infos.nic2 != null && infos.nic2.GetLength(0) > 0;
                 if (hasNic2)
                 {
                     NIC2_Name.Visibility = Visibility.Visible;
                     NIC2_INFOS1.Visibility = Visibility.Visible;
                     NIC2_INFOS2.Visibility = Visibility.Visible;
 
-                    NIC2_Name.Content = infos.nic2[0, 1] ?? NIC2_Name.Content;
+                    if (!string.IsNullOrEmpty(nic2Title)) NIC2_Name.Content = nic2Title;
                     NIC2_INFOS1.Text = labels2;
                     NIC2_INFOS2.Text = values2;
 

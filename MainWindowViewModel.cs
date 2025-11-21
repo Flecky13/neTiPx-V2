@@ -1,6 +1,7 @@
 ﻿using Microsoft.Toolkit.Mvvm.ComponentModel;
 using Microsoft.Toolkit.Mvvm.Input;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -118,13 +119,16 @@ namespace neTiPx
 
                 var lines = System.IO.File.ReadAllLines(iniPfad);
                 string? nic1 = null, nic2 = null;
+                // Parse INI into dictionary to be robust against spaces and sections
+                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var line in lines)
                 {
-                    if (line.StartsWith("Adapter1", StringComparison.OrdinalIgnoreCase))
-                        nic1 = line.Split('=')[1].Trim();
-                    else if (line.StartsWith("Adapter2", StringComparison.OrdinalIgnoreCase))
-                        nic2 = line.Split('=')[1].Trim();
+                    if (string.IsNullOrWhiteSpace(line) || !line.Contains("=")) continue;
+                    var parts = line.Split(new[] { '=' }, 2);
+                    dict[parts[0].Trim()] = parts[1].Trim();
                 }
+                dict.TryGetValue("Adapter1", out nic1);
+                dict.TryGetValue("Adapter2", out nic2);
 
                 string[,]? info1 = null, info2 = null;
                 if (!string.IsNullOrEmpty(nic1)) info1 = NetzwerkInfo.HoleNetzwerkInfo(nic1);
