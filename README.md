@@ -1,6 +1,6 @@
 ## neTiPx — Netzwerk-Info Tool (C#)
 
-![Alt text](images/APP.png)
+![Alt text](Images/APP.png)
 
 Kurze Beschreibung
 -------------------
@@ -29,7 +29,7 @@ Office.Subnet = 255.255.255.0
 Office.GW = 192.168.1.1
 Office.DNS = 8.8.8.8
 ```
-![Alt text](images/Config.png)
+![Alt text](Images/Config.png)
 
 Hinweis: Die Werte in `Adapter1`/`Adapter2` sollten den `NetConnectionID`-Namen der Adapter entsprechen (z. B. "Ethernet", "WLAN" oder die Anzeige "Name - Description", je nach System).
 
@@ -42,7 +42,7 @@ Bereich `IP Settings`, in dem du mehrere IP-Profile als Tabs anlegen kannst. Jed
 - Modus: `DHCP` oder `Manuell` (nur IPv4)
 - Bei `Manuell`: Felder für `IP`, `Subnetz`, `Gateway`, `DNS`
 
-![Alt text](images/IP_Settings.png)
+![Alt text](Images/IP_Settings.png)
 
 
 Anwenden einer Konfiguration
