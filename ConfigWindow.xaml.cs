@@ -186,7 +186,7 @@ namespace neTiPx
                 MessageBox.Show("Konfiguration gespeichert.");
 
                 // Close the config window after saving
-                this.Close();
+                //this.Close();
             }
             catch (Exception ex)
             {
@@ -194,7 +194,7 @@ namespace neTiPx
             }
         }
 
-        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
         }
