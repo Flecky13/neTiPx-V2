@@ -41,6 +41,7 @@
         </TabControl>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button x:Name="BtnApply" Width="80" Margin="4" Click="BtnApply_Click">Anwenden</Button>
             <Button x:Name="BtnSave" Width="80" Margin="4" Click="BtnSave_Click">Speichern</Button>
             <Button x:Name="BtnCancel" Width="80" Margin="4" Click="BtnClose_Click">Schliessen</Button>
         </StackPanel>

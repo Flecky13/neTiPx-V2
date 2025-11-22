@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace neTiPx
 {
@@ -23,15 +24,15 @@ namespace neTiPx
         private class IpTabData
         {
             public int Index;
-            public TabItem Tab;
-            public ComboBox AdapterCombo;
-            public TextBox TxtName;
-            public RadioButton RbDhcp;
-            public RadioButton RbManual;
-            public TextBox TxtIP;
-            public TextBox TxtSubnet;
-            public TextBox TxtGateway;
-            public TextBox TxtDNS;
+            public TabItem? Tab;
+            public ComboBox? AdapterCombo;
+            public TextBox? TxtName;
+            public RadioButton? RbDhcp;
+            public RadioButton? RbManual;
+            public TextBox? TxtIP;
+            public TextBox? TxtSubnet;
+            public TextBox? TxtGateway;
+            public TextBox? TxtDNS;
         }
 
         public ConfigWindow()
@@ -52,6 +53,15 @@ namespace neTiPx
                     {
                         tc.SelectionChanged += TabControlMain_SelectionChanged;
                     }
+                        // Also attach selection handler for the dynamic IP tabs control
+                        try
+                        {
+                            if (this.FindName("IpTabsControl") is TabControl itc)
+                            {
+                                itc.SelectionChanged += IpTabsControl_SelectionChanged;
+                            }
+                        }
+                        catch { }
                 }
                 catch { }
             }
@@ -61,6 +71,147 @@ namespace neTiPx
             }
         }
 
+
+            private async void BtnApply_Click(object sender, RoutedEventArgs e)
+            {
+                try
+                {
+                    if (IpTabsControl == null) return;
+                    if (!(IpTabsControl.SelectedItem is TabItem ti))
+                    {
+                        MessageBox.Show("Kein IP-Tab ausgewählt.");
+                        return;
+                    }
+                    var data = _ipTabs.FirstOrDefault(t => t.Tab == ti);
+                    if (data == null)
+                    {
+                        MessageBox.Show("Tab-Daten nicht gefunden.");
+                        return;
+                    }
+
+                    var adapterKey = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+                    if (string.IsNullOrEmpty(adapterKey))
+                    {
+                        MessageBox.Show("Kein Adapter im Tab ausgewählt.");
+                        return;
+                    }
+
+                    // Find network interface by Name or Description or display
+                    var ni = NetworkInterface.GetAllNetworkInterfaces()
+                        .FirstOrDefault(n => string.Equals(n.Name, adapterKey, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(n.Description, adapterKey, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(n.Name + " - " + n.Description, adapterKey, StringComparison.OrdinalIgnoreCase));
+                    if (ni == null)
+                    {
+                        MessageBox.Show($"Netzwerkadapter '{adapterKey}' nicht gefunden.");
+                        return;
+                    }
+
+                    // Determine mode
+                    bool isDhcp = data.RbDhcp != null && data.RbDhcp.IsChecked == true;
+
+                    var commands = new List<string>();
+                    if (isDhcp)
+                    {
+                        // set DHCP for IP and DNS in a single elevated call
+                        commands.Add($"netsh interface ipv4 set address name=\"{ni.Name}\" source=dhcp");
+                        commands.Add($"netsh interface ipv4 set dns name=\"{ni.Name}\" source=dhcp");
+                    }
+                    else
+                    {
+                        var ip = data.TxtIP?.Text.Trim() ?? string.Empty;
+                        var mask = data.TxtSubnet?.Text.Trim() ?? string.Empty;
+                        var gw = data.TxtGateway?.Text.Trim() ?? string.Empty;
+                        var dns = data.TxtDNS?.Text.Trim() ?? string.Empty;
+
+                        if (!IsValidIPv4(ip) || !IsValidIPv4(mask))
+                        {
+                            MessageBox.Show("IP oder Subnetz ungültig. Bitte prüfen.");
+                            return;
+                        }
+
+                        string addrCmd = $"netsh interface ipv4 set address name=\"{ni.Name}\" source=static addr={ip} mask={mask}";
+                        if (IsValidIPv4(gw)) addrCmd += $" gateway={gw} gwmetric=1";
+                        commands.Add(addrCmd);
+
+                        if (IsValidIPv4(dns))
+                        {
+                            commands.Add($"netsh interface ipv4 set dns name=\"{ni.Name}\" source=static addr={dns} register=primary");
+                        }
+                    }
+
+                    // Execute all netsh commands in one elevated process to avoid multiple UAC prompts
+                    if (commands.Count > 0)
+                    {
+                        if (!RunNetshCommandsElevated(commands))
+                        {
+                            MessageBox.Show("Fehler beim Anwenden der Netzwerkeinstellungen.");
+                            return;
+                        }
+                    }
+
+                    // On success: mark tab as applied and persist
+                    try { if (data.Tab != null) data.Tab.Foreground = Brushes.Green; } catch { }
+                    // Reset other tabs with same adapter to default black
+                    foreach (var other in _ipTabs)
+                    {
+                        if (other == data) continue;
+                        var otherAdapter = (other.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
+                        if (!string.IsNullOrEmpty(adapterKey) && string.Equals(adapterKey, otherAdapter, StringComparison.OrdinalIgnoreCase))
+                        {
+                            try { if (other.Tab != null) other.Tab.Foreground = Brushes.Black; } catch { }
+                        }
+                    }
+
+                    // Save settings so applied state and values persist
+                    try
+                    {
+                        var iniPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                        var values = ReadIniToDict(iniPath);
+                        SaveIpSettings(values);
+                    }
+                    catch { }
+
+                    MessageBox.Show("Einstellungen angewendet.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Fehler beim Anwenden: " + ex.Message);
+                }
+            }
+
+            private bool RunNetshCommandsElevated(IEnumerable<string> commands)
+            {
+                try
+                {
+                    // Join commands with & so cmd.exe executes them sequentially in one elevated process
+                    var cmdLine = string.Join(" & ", commands);
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = "/c " + cmdLine,
+                        UseShellExecute = true,
+                        Verb = "runas",
+                        CreateNoWindow = true,
+                        WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
+                    };
+                    var p = System.Diagnostics.Process.Start(psi);
+                    if (p == null) return false;
+                    p.WaitForExit();
+                    return p.ExitCode == 0;
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                    // User probably cancelled UAC
+                    MessageBox.Show("Berechtigung erforderlich: Starte Anwendung mit Administratorrechten oder bestätige die UAC-Eingabe.");
+                    return false;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Fehler beim Ausführen von netsh: " + ex.Message);
+                    return false;
+                }
+            }
         private void LoadAdapters()
         {
             try
@@ -439,7 +590,7 @@ namespace neTiPx
         private void LoadSystemValuesIntoTab(IpTabData data)
         {
             if (data == null) return;
-            var sel = (data.AdapterCombo.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            var sel = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
             if (string.IsNullOrEmpty(sel)) return;
             var sys = GetSystemIpv4Settings(sel);
             if (sys != null)
@@ -672,6 +823,13 @@ namespace neTiPx
             {
                 MessageBox.Show("Fehler beim Speichern der IP-Einstellungen: " + ex.Message);
             }
+        }
+
+        private void IpTabsControl_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            // Intentionally no-op: selecting a tab should not change the applied coloring or persist settings.
+            // Coloring and persistence are handled only when the user clicks 'Anwenden'.
+            return;
         }
 
         private bool IsValidIPv4(string ip)
