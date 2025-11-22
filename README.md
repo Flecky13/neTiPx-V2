@@ -1,5 +1,7 @@
 ## neTiPx — Netzwerk-Info Tool (C#)
 
+![Alt text](images/APP.png)
+
 Kurze Beschreibung
 -------------------
 `neTiPx` ist ein kleines Windows-Tool (WPF, C#), das Netzwerkadapter aus einer Konfigurationsdatei lädt, deren Status anzeigt und einfache IP-Konfigurationen verwalten kann. Die App zeigt u. a. externe IPv4-Adresse, lokale IPv4-/IPv6-Adressen, MAC-Adresse, Gateway und DNS-Server an.
@@ -27,6 +29,7 @@ Office.Subnet = 255.255.255.0
 Office.GW = 192.168.1.1
 Office.DNS = 8.8.8.8
 ```
+![Alt text](images/Config.png)
 
 Hinweis: Die Werte in `Adapter1`/`Adapter2` sollten den `NetConnectionID`-Namen der Adapter entsprechen (z. B. "Ethernet", "WLAN" oder die Anzeige "Name - Description", je nach System).
 
@@ -38,6 +41,9 @@ Bereich `IP Settings`, in dem du mehrere IP-Profile als Tabs anlegen kannst. Jed
 - Auswahl eines Adapters (gefüllt aus `Adapter1`/`Adapter2`)
 - Modus: `DHCP` oder `Manuell` (nur IPv4)
 - Bei `Manuell`: Felder für `IP`, `Subnetz`, `Gateway`, `DNS`
+
+![Alt text](images/IP_Settings.png)
+
 
 Anwenden einer Konfiguration
 ----------------------------
