@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Diagnostics;
+using System.Windows.Documents;
 
 namespace neTiPx
 {
@@ -879,20 +881,63 @@ namespace neTiPx
 
                         var asm = System.Reflection.Assembly.GetExecutingAssembly();
                         var ver = asm.GetName().Version?.ToString() ?? "?";
-                        var info = "neTiPx - Netzwerk Infos - by Pedro Tepe\n\n" +
-                                   "Version: " + ver + "\n\n" +
-                                   "Lizenz:\n" +
-                                   "Dieses Programm steht unter der im Repository angegebenen Lizenz.\n\n" +
-                                   "Autor:\n" +
-                                   "Flecky13 - github@hometepe.de\n\n" +
-                                   "Repository:\n" +
-                                   "https://github.com/Flecky13/neTiPx-V2\n\n" +
-                                   "Beschreibung:\n" +
-                                   "Kleine Tray-App zur Anzeige von Netzwerk- und IP-Informationen.";
-
                         if (this.FindName("InfoText") is TextBlock tb)
                         {
-                            tb.Text = info;
+                            tb.Inlines.Clear();
+                            tb.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+                            tb.FontSize = 12;
+
+                            tb.Inlines.Add(new Run("neTiPx - Netzwerk Infos - by Pedro Tepe"));
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new LineBreak());
+
+                            tb.Inlines.Add(new Run("Version: " + ver));
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new LineBreak());
+
+                            tb.Inlines.Add(new Run("Lizenz:"));
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new Run("Dieses Programm steht unter der im Repository angegebenen Lizenz."));
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new LineBreak());
+
+                            tb.Inlines.Add(new Run("Autor:"));
+                            tb.Inlines.Add(new LineBreak());
+                            // Mailto hyperlink
+                            var email = "github@hometepe.de";
+                            var mailText = "Flecky13 - " + email;
+                            var mailLink = new Hyperlink(new Run(mailText)) { NavigateUri = new Uri("mailto:" + email) };
+                            mailLink.Click += (s2, e2) =>
+                            {
+                                try
+                                {
+                                    Process.Start(new ProcessStartInfo(mailLink.NavigateUri.AbsoluteUri) { UseShellExecute = true });
+                                }
+                                catch { }
+                            };
+                            tb.Inlines.Add(mailLink);
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new LineBreak());
+
+                            tb.Inlines.Add(new Run("Repository:"));
+                            tb.Inlines.Add(new LineBreak());
+                            var repoUrl = "https://github.com/Flecky13/neTiPx-V2";
+                            var repoLink = new Hyperlink(new Run(repoUrl)) { NavigateUri = new Uri(repoUrl) };
+                            repoLink.Click += (s3, e3) =>
+                            {
+                                try
+                                {
+                                    Process.Start(new ProcessStartInfo(repoLink.NavigateUri.AbsoluteUri) { UseShellExecute = true });
+                                }
+                                catch { }
+                            };
+                            tb.Inlines.Add(repoLink);
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new LineBreak());
+
+                            tb.Inlines.Add(new Run("Beschreibung:"));
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new Run("Kleine Tray-App zur Anzeige von Netzwerk- und IP-Informationen."));
                         }
 
                         if (this.FindName("InfoImage") is Image img)
