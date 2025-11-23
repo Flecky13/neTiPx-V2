@@ -253,6 +253,22 @@ namespace neTiPx
 
         // --------------------------------------------------------
 
+        // Zeigt das ContextMenuStrip an der aktuellen Cursor-Position an.
+        public void ShowContextMenuAtCursor()
+        {
+            try
+            {
+                var cms = _notifyIcon?.ContextMenuStrip;
+                if (cms == null) return;
+                var pos = System.Windows.Forms.Cursor.Position;
+                cms.Show(pos);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[NotifyIconWrapper] ShowContextMenuAtCursor failed: " + ex.Message);
+            }
+        }
+
         public class NotifyRequestRecord
         {
             public string Title { get; set; } = "";

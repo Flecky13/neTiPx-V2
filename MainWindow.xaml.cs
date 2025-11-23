@@ -2,12 +2,15 @@
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
 
 namespace neTiPx
 {
     public partial class MainWindow : Window
     {
+        private DateTime _suppressShowUntil = DateTime.MinValue;
+        private readonly TimeSpan _suppressDuration = TimeSpan.FromSeconds(5);
         // Internet- / Timer-Logik wurde ins ViewModel verschoben
 
         public MainWindow()
@@ -92,6 +95,12 @@ namespace neTiPx
         public void ShowWindowFromTray()
         {
             Debug.WriteLine("[MainWindow] ShowWindowFromTray aufgerufen");
+            // Unterdrückung prüfen
+            if (DateTime.Now < _suppressShowUntil)
+            {
+                Debug.WriteLine($"[MainWindow] Show unterdrückt bis {_suppressShowUntil}");
+                return;
+            }
             Dispatcher.Invoke(async () =>
             {
                 // Wenn das Fenster vorher verborgen war, zeigen
@@ -129,6 +138,46 @@ namespace neTiPx
         {
             UpdateGui();
             PositionWindowBottomRight();
+        }
+
+        private async void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                // Sofort verbergen (synchron auf UI-Thread)
+                Dispatcher.Invoke(() => this.Hide(), DispatcherPriority.Send);
+                Debug.WriteLine("[MainWindow] Mouseklick erkannt ");// Nur auf Rechtsklick reagieren
+
+// nur reagieren auf Klicks, Fenster sofort verbergen....
+/*
+                if (e.ChangedButton != MouseButton.Right)
+                    return;
+
+                Debug.WriteLine("[MainWindow] Rechtsklick erkannt -> Fenster sofort verbergen und Tray-Menü anzeigen");
+
+                // kurz warten, damit das Shell-Tray Zeit hat, den Fokus zu verarbeiten
+                await Task.Delay(20);
+
+                // ContextMenu des Tray-Icons anzeigen
+                try
+                {
+                    TrayIcon?.ShowContextMenuAtCursor();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainWindow] Fehler beim Anzeigen des Tray-Menüs: {ex.Message}");
+                }
+*/
+                // Unterdrücken, damit das Fenster nicht sofort wieder aufgeht
+                _suppressShowUntil = DateTime.Now.Add(_suppressDuration);
+                Debug.WriteLine($"[MainWindow] Show unterdrückt bis {_suppressShowUntil}");
+
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Fehler in Window_PreviewMouseDown: {ex.Message}");
+            }
         }
 
         public async void UpdateGui()
