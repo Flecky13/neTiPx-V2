@@ -38,6 +38,16 @@
                     <TabControl x:Name="IpTabsControl" Grid.Row="1" />
                 </Grid>
             </TabItem>
+            <TabItem Header="Info">
+                <ScrollViewer Margin="6" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Orientation="Horizontal" Margin="6">
+                        <Image x:Name="InfoImage" Width="96" Height="96" Margin="6" Stretch="Uniform" />
+                        <StackPanel Orientation="Vertical" Margin="6" Width="380">
+                            <TextBlock x:Name="InfoText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Padding="6" />
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
         </TabControl>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">

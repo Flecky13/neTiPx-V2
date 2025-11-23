@@ -15,6 +15,16 @@
     <Content Include="icons\toolicon.ico" />
   </ItemGroup>
 
+  <!-- Ensure Images (tool icons) are copied to output so runtime loading works -->
+  <ItemGroup>
+    <Content Include="Images\toolicon_transparent.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\toolicon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Toolkit.Mvvm" Version="7.0.0" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.31" />

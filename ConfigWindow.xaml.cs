@@ -5,6 +5,7 @@ using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace neTiPx
 {
@@ -854,6 +855,63 @@ namespace neTiPx
                         tc.SelectedIndex = 1;
                         // Ensure combo is filled/loaded
                         LoadIpSettings();
+                    }
+                    finally
+                    {
+                        ExitSuspendEvents();
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public void SelectInfoTab()
+        {
+            try
+            {
+                if (this.FindName("TabControlMain") is TabControl tc)
+                {
+                    EnterSuspendEvents();
+                    try
+                    {
+                        // Info tab is the third static tab (index 2)
+                        tc.SelectedIndex = 2;
+
+                        var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                        var ver = asm.GetName().Version?.ToString() ?? "?";
+                        var info = "neTiPx - Netzwerk Infos - by Pedro Tepe\n\n" +
+                                   "Version: " + ver + "\n\n" +
+                                   "Lizenz:\n" +
+                                   "Dieses Programm steht unter der im Repository angegebenen Lizenz.\n\n" +
+                                   "Autor:\n" +
+                                   "Flecky13 - github@hometepe.de\n\n" +
+                                   "Repository:\n" +
+                                   "https://github.com/Flecky13/neTiPx-V2\n\n" +
+                                   "Beschreibung:\n" +
+                                   "Kleine Tray-App zur Anzeige von Netzwerk- und IP-Informationen.";
+
+                        if (this.FindName("InfoText") is TextBlock tb)
+                        {
+                            tb.Text = info;
+                        }
+
+                        if (this.FindName("InfoImage") is Image img)
+                        {
+                            try
+                            {
+                                var imgPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "toolicon_transparent.png");
+                                if (System.IO.File.Exists(imgPath))
+                                {
+                                    var bmp = new BitmapImage();
+                                    bmp.BeginInit();
+                                    bmp.UriSource = new Uri(imgPath, UriKind.Absolute);
+                                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                                    bmp.EndInit();
+                                    img.Source = bmp;
+                                }
+                            }
+                            catch { }
+                        }
                     }
                     finally
                     {

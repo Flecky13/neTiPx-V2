@@ -45,6 +45,22 @@ namespace neTiPx
                         Debug.WriteLine($"[MainWindow] Fehler beim Öffnen ConfigWindow: {ex.Message}");
                     }
                 };
+                TrayIcon.InfoSelected += (s, e) =>
+                {
+                    try
+                    {
+                        // Verstecken und Config-Fenster öffnen auf Info-Tab
+                        this.Hide();
+                        var cfg = new ConfigWindow();
+                        cfg.Owner = this;
+                        try { cfg.GetType().GetMethod("SelectInfoTab")?.Invoke(cfg, null); } catch { }
+                        cfg.ShowDialog();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MainWindow] Fehler beim Öffnen Info-Tab: {ex.Message}");
+                    }
+                };
                 TrayIcon.IpSettingsSelected += (s, e) =>
                 {
                     try

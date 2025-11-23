@@ -71,6 +71,9 @@ namespace neTiPx
         private static readonly RoutedEvent IpSettingsSelectedEvent = EventManager.RegisterRoutedEvent(
             "IpSettingsSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
 
+        private static readonly RoutedEvent InfoSelectedEvent = EventManager.RegisterRoutedEvent(
+            "InfoSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
         public event RoutedEventHandler ShowSelected
         {
             add => AddHandler(ShowSelectedEvent, value);
@@ -99,6 +102,12 @@ namespace neTiPx
         {
             add => AddHandler(IpSettingsSelectedEvent, value);
             remove => RemoveHandler(IpSettingsSelectedEvent, value);
+        }
+
+        public event RoutedEventHandler InfoSelected
+        {
+            add => AddHandler(InfoSelectedEvent, value);
+            remove => RemoveHandler(InfoSelectedEvent, value);
         }
 
         // --------------------------------------------------------
@@ -215,10 +224,13 @@ namespace neTiPx
             var ipItem = new ToolStripMenuItem("IP Settings");
             ipItem.Click += IpItemOnClick;
 
+            var infoItem = new ToolStripMenuItem("Info");
+            infoItem.Click += InfoItemOnClick;
+
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += ExitItemOnClick;
 
-            return new ContextMenuStrip { Items = { configItem, ipItem, exitItem } };
+            return new ContextMenuStrip { Items = { configItem, ipItem, infoItem, exitItem } };
         }
 
         private void ConfigItemOnClick(object? sender, EventArgs args)
@@ -249,6 +261,12 @@ namespace neTiPx
         {
             Debug.WriteLine("[NotifyIconWrapper] - ExitItemOnClick ");
             RaiseEvent(new RoutedEventArgs(ExitSelectedEvent));
+        }
+
+        private void InfoItemOnClick(object? sender, EventArgs args)
+        {
+            Debug.WriteLine("[NotifyIconWrapper] - InfoItemOnClick ");
+            RaiseEvent(new RoutedEventArgs(InfoSelectedEvent));
         }
 
         // --------------------------------------------------------
