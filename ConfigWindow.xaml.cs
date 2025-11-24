@@ -36,6 +36,8 @@ namespace neTiPx
             public TextBox? TxtSubnet;
             public TextBox? TxtGateway;
             public TextBox? TxtDNS;
+            public System.Windows.Threading.DispatcherTimer? PingTimer;
+            public Label? LblGwStatus;
         }
 
         public ConfigWindow()
@@ -425,11 +427,24 @@ namespace neTiPx
             var panel = new StackPanel { Margin = new Thickness(6) };
 
             // Name (editable) - used as profile/section name in INI
-            var spName = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            // Top row: name on left, GW status on right
+            var spTop = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            spTop.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            spTop.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var spName = new StackPanel { Orientation = Orientation.Horizontal };
             spName.Children.Add(new TextBlock { Text = "Name:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
-            var txtName = new TextBox { Width = 260 };
+            var txtName = new TextBox { Width = 160 };
             spName.Children.Add(txtName);
-            panel.Children.Add(spName);
+            Grid.SetColumn(spName, 0);
+            spTop.Children.Add(spName);
+
+            // Gateway status label (top-right)
+            var lblGwStatus = new Label { Content = "GW: -", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2), Margin = new Thickness(8,0,0,0), VerticalAlignment = VerticalAlignment.Top };
+            Grid.SetColumn(lblGwStatus, 1);
+            spTop.Children.Add(lblGwStatus);
+
+            panel.Children.Add(spTop);
 
             // Adapter selection
             var spAdapter = new StackPanel { Orientation = Orientation.Horizontal };
@@ -498,6 +513,7 @@ namespace neTiPx
             data.TxtGateway = txtGw;
             data.TxtDNS = txtDns;
             data.TxtName = txtName;
+            data.LblGwStatus = lblGwStatus;
 
             // Initialize with any existing values: prefer profileName-based keys (profile.Key), otherwise legacy IpTab{index}
             string profileKey = profileName ?? string.Empty;
@@ -830,9 +846,97 @@ namespace neTiPx
 
         private void IpTabsControl_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            // Intentionally no-op: selecting a tab should not change the applied coloring or persist settings.
-            // Coloring and persistence are handled only when the user clicks 'Anwenden'.
-            return;
+            if (EventsSuspended) return;
+            try
+            {
+                if (e.OriginalSource != sender) return;
+                if (!(sender is TabControl tc)) return;
+
+                // Stop timers on all tabs
+                foreach (var t in _ipTabs)
+                {
+                    try { t.PingTimer?.Stop(); } catch { }
+                }
+
+                // Start timer for selected tab only (if any)
+                if (tc.SelectedItem is TabItem ti)
+                {
+                    var data = _ipTabs.FirstOrDefault(t => t.Tab == ti);
+                    if (data != null)
+                    {
+                        // Ensure existing timer stopped
+                        try { data.PingTimer?.Stop(); } catch { }
+
+                        var timer = new System.Windows.Threading.DispatcherTimer();
+                        timer.Interval = TimeSpan.FromSeconds(3);
+                        timer.Tick += async (s, ev) =>
+                        {
+                                try
+                                {
+                                    // Always use the current gateway of the selected network interface
+                                    var selAdapter = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+                                    string gw = string.Empty;
+                                    if (!string.IsNullOrEmpty(selAdapter))
+                                    {
+                                        var sys = GetSystemIpv4Settings(selAdapter);
+                                        if (sys != null) gw = sys.Value.gateway ?? string.Empty;
+                                    }
+
+                                    if (string.IsNullOrEmpty(gw))
+                                    {
+                                        // update label to unknown (no gateway found on NIC)
+                                        data.LblGwStatus?.Dispatcher.Invoke(() =>
+                                        {
+                                            if (data.LblGwStatus != null)
+                                            {
+                                                data.LblGwStatus.Content = "GW: -";
+                                                data.LblGwStatus.Background = Brushes.LightGray;
+                                            }
+                                        });
+                                        return;
+                                    }
+
+                                    using var p = new System.Net.NetworkInformation.Ping();
+                                    try
+                                    {
+                                        var reply = await p.SendPingAsync(gw, 2000);
+                                        data.LblGwStatus?.Dispatcher.Invoke(() =>
+                                        {
+                                            if (data.LblGwStatus == null) return;
+                                            if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
+                                            {
+                                                data.LblGwStatus.Content = $"GW: {gw} ({reply.RoundtripTime} ms)";
+                                                data.LblGwStatus.Background = Brushes.LightGreen;
+                                            }
+                                            else
+                                            {
+                                                data.LblGwStatus.Content = $"GW: {gw} (no reply)";
+                                                data.LblGwStatus.Background = Brushes.IndianRed;
+                                            }
+                                        });
+                                    }
+                                    catch
+                                    {
+                                        data.LblGwStatus?.Dispatcher.Invoke(() =>
+                                        {
+                                            if (data.LblGwStatus == null) return;
+                                            data.LblGwStatus.Content = $"GW: {gw} (error)";
+                                            data.LblGwStatus.Background = Brushes.IndianRed;
+                                        });
+                                    }
+                                }
+                            catch { }
+                        };
+
+                        data.PingTimer = timer;
+                        // run immediately then start
+                        try { timer.Start(); } catch { }
+                        // trigger immediate tick once
+                        timer.Dispatcher.InvokeAsync(async () => await System.Threading.Tasks.Task.Run(() => { /* immediate start handled by Tick after Start */ }));
+                    }
+                }
+            }
+            catch { }
         }
 
         private bool IsValidIPv4(string ip)
