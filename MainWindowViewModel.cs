@@ -110,7 +110,7 @@ namespace neTiPx
         {
             try
             {
-                string iniPfad = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                string iniPfad = ConfigFileHelper.GetConfigIniPath();
                 if (!System.IO.File.Exists(iniPfad))
                 {
                     Debug.WriteLine("[MainWindowViewModel] Keine INI gefunden");
