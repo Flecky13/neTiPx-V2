@@ -59,3 +59,5 @@ Weitere Hinweise
 Lizenz & Kontakt
 ----------------
 Siehe `LICENSE` im Repository. Für Fragen zum Code bitte Issues/PRs im Repo verwenden.
+
+https://buymeacoffee.com/pedrotepe
