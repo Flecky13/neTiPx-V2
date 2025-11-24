@@ -169,7 +169,7 @@ namespace neTiPx
                     // Save settings so applied state and values persist
                     try
                     {
-                        var iniPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                        var iniPath = ConfigFileHelper.GetConfigIniPath();
                         var values = ReadIniToDict(iniPath);
                         SaveIpSettings(values);
                     }
@@ -224,7 +224,7 @@ namespace neTiPx
                 if (AdaptersPanel != null) AdaptersPanel.Children.Clear();
 
                 // Read Adapter selections from INI (Authoritative)
-                string iniPfad = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                string iniPfad = ConfigFileHelper.GetConfigIniPath();
                 var ini = ReadIniToDict(iniPfad);
                 string? sel1 = null, sel2 = null;
                 if (ini.TryGetValue("Adapter1", out var v1)) sel1 = v1;
@@ -318,7 +318,7 @@ namespace neTiPx
             try
             {
                 // Read existing INI values, update Adapter1/Adapter2 and then persist along with IP-settings
-                var iniPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                var iniPath = ConfigFileHelper.GetConfigIniPath();
                 var values = ReadIniToDict(iniPath);
 
                 values["Adapter1"] = (selected.Count > 0 ? (selected[0] ?? string.Empty) : string.Empty);
@@ -366,7 +366,7 @@ namespace neTiPx
                     _ipTabs.Clear();
                     IpTabsControl.Items.Clear();
 
-                    var iniPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                    var iniPath = ConfigFileHelper.GetConfigIniPath();
                     var values = ReadIniToDict(iniPath);
 
                     int created = 0;
@@ -717,7 +717,7 @@ namespace neTiPx
             {
                 int nextIndex = 1;
                 while (_ipTabs.Any(t => t.Index == nextIndex)) nextIndex++;
-                var iniPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                var iniPath = ConfigFileHelper.GetConfigIniPath();
                 var values = ReadIniToDict(iniPath);
                 var data = CreateIpTab(nextIndex, values);
                 _ipTabs.Add(data);
@@ -819,7 +819,7 @@ namespace neTiPx
                 // Save the ordered list of profile names
                 values["IpProfileNames"] = string.Join(",", profileNames);
 
-                var iniPfad = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.ini");
+                var iniPfad = ConfigFileHelper.GetConfigIniPath();
                 WriteDictToIni(iniPfad, values);
             }
             catch (Exception ex)
