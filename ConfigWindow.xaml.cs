@@ -24,6 +24,27 @@ namespace neTiPx
         private const int MaxIpTabs = 10;
         private readonly List<IpTabData> _ipTabs = new List<IpTabData>();
 
+        // Ping tools
+        private const int MaxPingEntries = 6;
+        private const int PingTimeoutMs = 2000;
+        private readonly List<PingEntryData> _pingEntries = new List<PingEntryData>();
+
+        private class PingEntryData
+        {
+            public CheckBox? Enabled;
+            public TextBox? TxtIp;
+            // stats
+            public DateTime? StartTime;
+            public int SentCount;
+            public int MissCount;
+            public Label? LblStart;
+            public Label? LblMiss;
+            public Label? LblLoss;
+            public Label? LblStatus;
+            public System.Windows.Threading.DispatcherTimer? Timer;
+            public Grid? RowPanel;
+        }
+
         private class IpTabData
         {
             public int Index;
@@ -50,6 +71,8 @@ namespace neTiPx
                 // Load UI state after InitializeComponent
                 LoadAdapters();
                 LoadIpSettings();
+                // Load Tools -> Ping entries
+                try { LoadPingSettings(); } catch { }
 
                 // Refresh lists when the user switches tabs so INI is always authoritative
                 try
@@ -835,6 +858,44 @@ namespace neTiPx
                 // Save the ordered list of profile names
                 values["IpProfileNames"] = string.Join(",", profileNames);
 
+                // Persist Tools -> Ping entries
+                // Remove any previous Tools.Ping* keys
+                var oldKeys = values.Keys.ToList();
+                foreach (var k in oldKeys)
+                {
+                    if (k.StartsWith("Tools.Ping", StringComparison.OrdinalIgnoreCase) || k.Equals("Tools.PingCount", StringComparison.OrdinalIgnoreCase))
+                    {
+                        values.Remove(k);
+                    }
+                }
+
+                // Save current ping entries
+                values["Tools.PingCount"] = _pingEntries.Count.ToString();
+                for (int i = 0; i < _pingEntries.Count; i++)
+                {
+                    var p = _pingEntries[i];
+                    values[$"Tools.Ping{i}.Enabled"] = (p.Enabled != null && p.Enabled.IsChecked == true) ? "1" : "0";
+                    values[$"Tools.Ping{i}.IP"] = p.TxtIp?.Text.Trim() ?? string.Empty;
+                    // no timeout persisted per-entry (fixed timeout used)
+                }
+
+                // Save Ping table column widths from header grid
+                try
+                {
+                    if (this.FindName("PingHeaderGrid") is Grid headerGrid && headerGrid.ColumnDefinitions.Count >= 13)
+                    {
+                        values["Tools.PingColActivWidth"] = headerGrid.ColumnDefinitions[0].Width.Value.ToString("F0");
+                        values["Tools.PingColIpWidth"] = headerGrid.ColumnDefinitions[2].Width.Value.ToString("F0");
+                        values["Tools.PingColStartWidth"] = headerGrid.ColumnDefinitions[4].Width.Value.ToString("F0");
+                        values["Tools.PingColMissWidth"] = headerGrid.ColumnDefinitions[6].Width.Value.ToString("F0");
+                        values["Tools.PingColLossWidth"] = headerGrid.ColumnDefinitions[8].Width.Value.ToString("F0");
+                        values["Tools.PingColStatusWidth"] = headerGrid.ColumnDefinitions[10].Width.Value.ToString("F0");
+                        // Save the actions column width (column 12)
+                        values["Tools.PingColActionsWidth"] = headerGrid.ColumnDefinitions[12].Width.Value.ToString("F0");
+                    }
+                }
+                catch { }
+
                 var iniPfad = ConfigFileHelper.GetConfigIniPath();
                 WriteDictToIni(iniPfad, values);
             }
@@ -842,6 +903,334 @@ namespace neTiPx
             {
                 MessageBox.Show("Fehler beim Speichern der IP-Einstellungen: " + ex.Message);
             }
+        }
+
+        // --- Ping Tools: UI creation, timers and persistence ---
+        private void CreatePingRow(PingEntryData data, int index)
+        {
+            var panel = this.FindName("PingEntriesPanel") as StackPanel;
+            var headerGrid = this.FindName("PingHeaderGrid") as Grid;
+            if (panel == null || headerGrid == null) return;
+
+            // Create Grid matching header column structure
+            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+
+            // Copy column definitions from header grid
+            for (int i = 0; i < headerGrid.ColumnDefinitions.Count; i++)
+            {
+                var colDef = new ColumnDefinition();
+                colDef.Width = headerGrid.ColumnDefinitions[i].Width;
+                // Bind width changes so columns resize together
+                colDef.SetBinding(ColumnDefinition.WidthProperty, new System.Windows.Data.Binding("Width")
+                {
+                    Source = headerGrid.ColumnDefinitions[i],
+                    Mode = System.Windows.Data.BindingMode.TwoWay
+                });
+                row.ColumnDefinitions.Add(colDef);
+            }
+
+            var cb = new CheckBox { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4,0,4,0) };
+            var txtIp = new TextBox { Margin = new Thickness(4, 0, 4, 0) };
+            var lblStart = new Label { Content = "-", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
+            var lblMiss = new Label { Content = "0", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
+            var lblLoss = new Label { Content = "0%", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
+            var lblStatus = new Label { Content = "-", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
+
+            // per-row action buttons in last column
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            var btnReset = new Button { Width = 60, Content = "Reset", Margin = new Thickness(2,0,2,0) };
+            var btnDelete = new Button { Width = 32, Content = "🗑", Margin = new Thickness(2,0,0,0) };
+            btnPanel.Children.Add(btnReset);
+            btnPanel.Children.Add(btnDelete);
+
+            Grid.SetColumn(cb, 0);
+            Grid.SetColumn(txtIp, 2);
+            Grid.SetColumn(lblStart, 4);
+            Grid.SetColumn(lblMiss, 6);
+            Grid.SetColumn(lblLoss, 8);
+            Grid.SetColumn(lblStatus, 10);
+            Grid.SetColumn(btnPanel, 12);
+
+            row.Children.Add(cb);
+            row.Children.Add(txtIp);
+            row.Children.Add(lblStart);
+            row.Children.Add(lblMiss);
+            row.Children.Add(lblLoss);
+            row.Children.Add(lblStatus);
+            row.Children.Add(btnPanel);
+
+            panel.Children.Add(row);
+
+            data.Enabled = cb;
+            data.TxtIp = txtIp;
+            data.LblStart = lblStart;
+            data.LblMiss = lblMiss;
+            data.LblLoss = lblLoss;
+            data.LblStatus = lblStatus;
+            // hook events
+            txtIp.TextChanged += (s, ev) =>
+            {
+                var ip = txtIp.Text.Trim();
+                bool valid = IsValidIPv4(ip);
+                // disable checkbox if invalid
+                cb.IsEnabled = valid;
+                if (!valid)
+                {
+                    cb.IsChecked = false;
+                    txtIp.BorderBrush = Brushes.IndianRed;
+                }
+                else
+                {
+                    txtIp.BorderBrush = SystemColors.ControlDarkBrush;
+                }
+            };
+
+            cb.Checked += (s, ev) =>
+            {
+                // during load operations we suppress validations
+                if (EventsSuspended) return;
+                // validate on check
+                var ip = txtIp.Text.Trim();
+                if (!IsValidIPv4(ip))
+                {
+                    MessageBox.Show("Ungültige IP-Adresse.");
+                    cb.IsChecked = false;
+                }
+            };
+
+            btnReset.Click += (s, ev) =>
+            {
+                data.SentCount = 0;
+                data.MissCount = 0;
+                data.StartTime = null;
+                if (data.LblStart != null) data.LblStart.Content = "-";
+                if (data.LblMiss != null) data.LblMiss.Content = "0";
+                if (data.LblLoss != null) data.LblLoss.Content = "0%";
+                if (data.LblStatus != null) { data.LblStatus.Content = "-"; data.LblStatus.Background = Brushes.LightGray; }
+            };
+
+            btnDelete.Click += (s, ev) =>
+            {
+                try { data.Timer?.Stop(); } catch { }
+                try { if (data.RowPanel != null) (this.FindName("PingEntriesPanel") as StackPanel)?.Children.Remove(data.RowPanel); } catch { }
+                _pingEntries.Remove(data);
+            };
+            data.RowPanel = row;
+
+            // Timer for this row
+            var timer = new System.Windows.Threading.DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(3);
+            timer.Tick += async (s, ev) =>
+            {
+                try
+                {
+                    if (data.Enabled == null || data.TxtIp == null || data.LblStatus == null) return;
+                    if (data.Enabled.IsChecked != true)
+                    {
+                        // update start label to reflect inactivity
+                        data.LblStart?.Dispatcher.Invoke(() =>
+                        {
+                            if (data.LblStart != null) data.LblStart.Content = "-";
+                            if (data.LblMiss != null) data.LblMiss.Content = "0";
+                            if (data.LblLoss != null) data.LblLoss.Content = "0%";
+                            data.LblStatus.Content = "-";
+                            data.LblStatus.Background = Brushes.LightGray;
+                        });
+                        return;
+                    }
+
+                    var ip = data.TxtIp.Text.Trim();
+                    if (string.IsNullOrEmpty(ip))
+                    {
+                        data.LblStatus.Dispatcher.Invoke(() =>
+                        {
+                            data.LblStatus.Content = "no IP";
+                            data.LblStatus.Background = Brushes.IndianRed;
+                        });
+                        return;
+                    }
+
+                    int timeout = PingTimeoutMs;
+
+                    // increment sent count
+                    data.SentCount++;
+                    if (data.StartTime == null) data.StartTime = DateTime.Now;
+
+                    using var p = new System.Net.NetworkInformation.Ping();
+                    try
+                    {
+                        var reply = await p.SendPingAsync(ip, timeout);
+                        if (reply.Status == IPStatus.Success)
+                        {
+                            // success
+                            data.LblStatus.Dispatcher.Invoke(() =>
+                            {
+                                data.LblStatus.Content = $"{reply.RoundtripTime} ms";
+                                data.LblStatus.Background = Brushes.LightGreen;
+                            });
+                        }
+                        else
+                        {
+                            // failed
+                            data.MissCount++;
+                            data.LblStatus.Dispatcher.Invoke(() =>
+                            {
+                                data.LblStatus.Content = "no reply";
+                                data.LblStatus.Background = Brushes.IndianRed;
+                            });
+                        }
+                    }
+                    catch
+                    {
+                        data.MissCount++;
+                        data.LblStatus.Dispatcher.Invoke(() =>
+                        {
+                            data.LblStatus.Content = "error";
+                            data.LblStatus.Background = Brushes.IndianRed;
+                        });
+                    }
+
+                    // update stats labels
+                    data.LblStart?.Dispatcher.Invoke(() =>
+                    {
+                        if (data.LblStart != null)
+                        {
+                            if (data.StartTime != null)
+                            {
+                                var secs = (int)(DateTime.Now - data.StartTime.Value).TotalSeconds;
+                                data.LblStart.Content = $"vor {secs}s";
+                            }
+                            else data.LblStart.Content = "-";
+                        }
+                    });
+                    data.LblMiss?.Dispatcher.Invoke(() => { if (data.LblMiss != null) data.LblMiss.Content = data.MissCount.ToString(); });
+                    data.LblLoss?.Dispatcher.Invoke(() =>
+                    {
+                        if (data.LblLoss != null)
+                        {
+                            if (data.SentCount > 0)
+                            {
+                                var loss = (int)Math.Round(100.0 * data.MissCount / data.SentCount);
+                                data.LblLoss.Content = loss + "%";
+                            }
+                            else data.LblLoss.Content = "0%";
+                        }
+                    });
+                }
+                catch { }
+            };
+
+            data.Timer = timer;
+            // Start timer
+            try { timer.Start(); } catch { }
+        }
+
+        private void BtnAddPingEntry_Click(object sender, RoutedEventArgs e)
+        {
+            if (_pingEntries.Count >= MaxPingEntries)
+            {
+                MessageBox.Show($"Maximal {MaxPingEntries} Ping-Einträge erlaubt.");
+                return;
+            }
+            var p = new PingEntryData();
+            _pingEntries.Add(p);
+            CreatePingRow(p, _pingEntries.Count - 1);
+        }
+
+        private void BtnRemovePingEntry_Click(object sender, RoutedEventArgs e)
+        {
+            if (_pingEntries.Count == 0) return;
+            // remove last entry
+            var last = _pingEntries[_pingEntries.Count - 1];
+            try { last.Timer?.Stop(); } catch { }
+            try { if (last.RowPanel != null) (this.FindName("PingEntriesPanel") as StackPanel)?.Children.Remove(last.RowPanel); } catch { }
+            _pingEntries.RemoveAt(_pingEntries.Count - 1);
+        }
+
+        private void BtnResetAllPingEntries_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (var p in _pingEntries)
+            {
+                p.SentCount = 0;
+                p.MissCount = 0;
+                p.StartTime = null;
+                if (p.LblStart != null) p.LblStart.Content = "-";
+                if (p.LblMiss != null) p.LblMiss.Content = "0";
+                if (p.LblLoss != null) p.LblLoss.Content = "0%";
+                if (p.LblStatus != null) { p.LblStatus.Content = "-"; p.LblStatus.Background = Brushes.LightGray; }
+            }
+        }
+
+        private void StopAllPingTimers()
+        {
+            foreach (var p in _pingEntries)
+            {
+                try { p.Timer?.Stop(); } catch { }
+            }
+        }
+
+        private void LoadPingSettings()
+        {
+            try
+            {
+                var iniPath = ConfigFileHelper.GetConfigIniPath();
+                var values = ReadIniToDict(iniPath);
+
+                // Load and apply saved column widths to header grid before creating rows
+                try
+                {
+                    if (this.FindName("PingHeaderGrid") is Grid headerGrid && headerGrid.ColumnDefinitions.Count >= 13)
+                    {
+                        if (values.TryGetValue("Tools.PingColActivWidth", out var w0) && double.TryParse(w0, out var v0) && v0 > 0)
+                            headerGrid.ColumnDefinitions[0].Width = new GridLength(v0);
+                        if (values.TryGetValue("Tools.PingColIpWidth", out var w2) && double.TryParse(w2, out var v2) && v2 > 0)
+                            headerGrid.ColumnDefinitions[2].Width = new GridLength(v2);
+                        if (values.TryGetValue("Tools.PingColStartWidth", out var w4) && double.TryParse(w4, out var v4) && v4 > 0)
+                            headerGrid.ColumnDefinitions[4].Width = new GridLength(v4);
+                        if (values.TryGetValue("Tools.PingColMissWidth", out var w6) && double.TryParse(w6, out var v6) && v6 > 0)
+                            headerGrid.ColumnDefinitions[6].Width = new GridLength(v6);
+                        if (values.TryGetValue("Tools.PingColLossWidth", out var w8) && double.TryParse(w8, out var v8) && v8 > 0)
+                            headerGrid.ColumnDefinitions[8].Width = new GridLength(v8);
+                        if (values.TryGetValue("Tools.PingColStatusWidth", out var w10) && double.TryParse(w10, out var v10) && v10 > 0)
+                            headerGrid.ColumnDefinitions[10].Width = new GridLength(v10);
+                        // Load the actions column width (column 12)
+                        if (values.TryGetValue("Tools.PingColActionsWidth", out var w12) && double.TryParse(w12, out var v12) && v12 > 0)
+                            headerGrid.ColumnDefinitions[12].Width = new GridLength(v12);
+                    }
+                }
+                catch { }
+
+                int count = 0;
+                if (values.TryGetValue("Tools.PingCount", out var sc)) int.TryParse(sc, out count);
+                for (int i = 0; i < count; i++)
+                {
+                        var p = new PingEntryData();
+                        _pingEntries.Add(p);
+                        CreatePingRow(p, i);
+                        // First set IP (so TextChanged can set enabled state), then set Enabled flag
+                        if (values.TryGetValue($"Tools.Ping{i}.IP", out var ip))
+                        {
+                            if (p.TxtIp != null) p.TxtIp.Text = ip;
+                            if (p.Enabled != null)
+                            {
+                                // set enabled state based on validity (but don't trigger Checked validation during load)
+                                p.Enabled.IsEnabled = IsValidIPv4(ip);
+                            }
+                        }
+                        if (values.TryGetValue($"Tools.Ping{i}.Enabled", out var en) && en == "1")
+                        {
+                            if (p.Enabled != null) p.Enabled.IsChecked = true;
+                        }
+                            // no per-entry timeout to load (fixed timeout used)
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            try { StopAllPingTimers(); } catch { }
+            base.OnClosing(e);
         }
 
         private void IpTabsControl_SelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1070,5 +1459,31 @@ namespace neTiPx
             }
             catch { }
         }
+
+        public void SelectToolsTab()
+        {
+            try
+            {
+                if (this.FindName("TabControlMain") is TabControl tc)
+                {
+                    EnterSuspendEvents();
+                    try
+                    {
+                        for (int i = 0; i < tc.Items.Count; i++)
+                        {
+                            if (tc.Items[i] is TabItem ti && (ti.Header?.ToString() ?? string.Empty).IndexOf("Tools", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                tc.SelectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    finally { ExitSuspendEvents(); }
+                }
+            }
+            catch { }
+        }
+
+
     }
 }

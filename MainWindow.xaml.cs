@@ -78,6 +78,21 @@ namespace neTiPx
                         Debug.WriteLine($"[MainWindow] Fehler beim Öffnen ConfigWindow (IP Settings): {ex.Message}");
                     }
                 };
+                TrayIcon.ToolsSelected += (s, e) =>
+                {
+                    try
+                    {
+                        this.Hide();
+                        var cfg = new ConfigWindow();
+                        cfg.Owner = this;
+                        try { cfg.GetType().GetMethod("SelectToolsTab")?.Invoke(cfg, null); } catch { }
+                        cfg.ShowDialog();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MainWindow] Fehler beim Öffnen Tools-Tab: {ex.Message}");
+                    }
+                };
             }
             catch (Exception ex)
             {

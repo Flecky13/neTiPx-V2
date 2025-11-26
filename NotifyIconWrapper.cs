@@ -74,6 +74,9 @@ namespace neTiPx
         private static readonly RoutedEvent InfoSelectedEvent = EventManager.RegisterRoutedEvent(
             "InfoSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
 
+        private static readonly RoutedEvent ToolsSelectedEvent = EventManager.RegisterRoutedEvent(
+            "ToolsSelected", RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(NotifyIconWrapper));
+
         public event RoutedEventHandler ShowSelected
         {
             add => AddHandler(ShowSelectedEvent, value);
@@ -108,6 +111,12 @@ namespace neTiPx
         {
             add => AddHandler(InfoSelectedEvent, value);
             remove => RemoveHandler(InfoSelectedEvent, value);
+        }
+
+        public event RoutedEventHandler ToolsSelected
+        {
+            add => AddHandler(ToolsSelectedEvent, value);
+            remove => RemoveHandler(ToolsSelectedEvent, value);
         }
 
         // --------------------------------------------------------
@@ -227,10 +236,13 @@ namespace neTiPx
             var infoItem = new ToolStripMenuItem("Info");
             infoItem.Click += InfoItemOnClick;
 
+            var toolsItem = new ToolStripMenuItem("Tools");
+            toolsItem.Click += ToolsItemOnClick;
+
             var exitItem = new ToolStripMenuItem("Exit");
             exitItem.Click += ExitItemOnClick;
 
-            return new ContextMenuStrip { Items = { configItem, ipItem, infoItem, exitItem } };
+            return new ContextMenuStrip { Items = { configItem, ipItem, toolsItem, infoItem, exitItem } };
         }
 
         private void ConfigItemOnClick(object? sender, EventArgs args)
@@ -267,6 +279,12 @@ namespace neTiPx
         {
             Debug.WriteLine("[NotifyIconWrapper] - InfoItemOnClick ");
             RaiseEvent(new RoutedEventArgs(InfoSelectedEvent));
+        }
+
+        private void ToolsItemOnClick(object? sender, EventArgs args)
+        {
+            Debug.WriteLine("[NotifyIconWrapper] - ToolsItemOnClick ");
+            RaiseEvent(new RoutedEventArgs(ToolsSelectedEvent));
         }
 
         // --------------------------------------------------------
