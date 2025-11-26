@@ -913,7 +913,7 @@ namespace neTiPx
             if (panel == null || headerGrid == null) return;
 
             // Create Grid matching header column structure
-            var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
 
             // Copy column definitions from header grid
             for (int i = 0; i < headerGrid.ColumnDefinitions.Count; i++)
@@ -929,17 +929,17 @@ namespace neTiPx
                 row.ColumnDefinitions.Add(colDef);
             }
 
-            var cb = new CheckBox { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4,0,4,0) };
-            var txtIp = new TextBox { Margin = new Thickness(4, 0, 4, 0) };
-            var lblStart = new Label { Content = "-", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
-            var lblMiss = new Label { Content = "0", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
-            var lblLoss = new Label { Content = "0%", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
-            var lblStatus = new Label { Content = "-", Background = Brushes.LightGray, Padding = new Thickness(6,2,6,2) };
+            var cb = new CheckBox { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2,0,2,0) };
+            var txtIp = new TextBox { Style = TryFindResource("PingIpTextBox") as Style };
+            var lblStart = new Label { Content = "-", Style = TryFindResource("PingCellLabel") as Style };
+            var lblMiss = new Label { Content = "0", Style = TryFindResource("PingCellLabel") as Style };
+            var lblLoss = new Label { Content = "0%", Style = TryFindResource("PingCellLabel") as Style };
+            var lblStatus = new Label { Content = "-", Style = TryFindResource("PingCellLabel") as Style };
 
             // per-row action buttons in last column
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
-            var btnReset = new Button { Width = 60, Content = "Reset", Margin = new Thickness(2,0,2,0) };
-            var btnDelete = new Button { Width = 32, Content = "🗑", Margin = new Thickness(2,0,0,0) };
+            var btnReset = new Button { Width = 50, Content = "Reset", Style = TryFindResource("PingActionButton") as Style };
+            var btnDelete = new Button { Width = 30, Content = "🗑", Style = TryFindResource("PingActionButton") as Style };
             btnPanel.Children.Add(btnReset);
             btnPanel.Children.Add(btnDelete);
 
