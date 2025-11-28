@@ -1,7 +1,7 @@
 <Window x:Class="neTiPx.ConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Config" Height="420" Width="700" WindowStartupLocation="CenterScreen">
+        Title="Config" Height="420" Width="650" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <!-- Gemeinsame Styles für Ping-Header und Zellen -->
         <Style x:Key="PingHeaderText" TargetType="TextBlock">
@@ -24,12 +24,22 @@
             <Setter Property="Padding" Value="4,1,4,1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="FontSize" Value="12"/>
+            <Style.Triggers>
+                <!-- Dezenter Hover-Effekt bei Fehler -->
+                <Trigger Property="BorderBrush" Value="IndianRed">
+                    <Setter Property="BorderBrush" Value="#FFAA9999"/>
+                    <Setter Property="BorderThickness" Value="1.5"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="PingActionButton" TargetType="Button">
             <Setter Property="Margin" Value="2,0,0,0"/>
             <Setter Property="Padding" Value="4,0,4,0"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
+        <!-- Alternierende Zeilen-Hintergründe -->
+        <SolidColorBrush x:Key="PingRowEvenBg" Color="#FAFAFA"/>
+        <SolidColorBrush x:Key="PingRowOddBg" Color="#F0F0F0"/>
         <Style TargetType="GridSplitter" x:Key="ThinSplitter">
             <Setter Property="Width" Value="2"/>
             <Setter Property="Background" Value="#CCCCCC"/>
@@ -92,7 +102,7 @@
                                 <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
                                     <Button x:Name="BtnAddPingEntry" Width="110" Margin="2" Click="BtnAddPingEntry_Click">Ping hinzufügen</Button>
                                     <Button x:Name="BtnResetAllPingEntries" Width="110" Margin="2" Click="BtnResetAllPingEntries_Click">Reset Alle</Button>
-                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(max. 6 • Spaltenbreite mit Maus anpassen)</TextBlock>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(max. 6 • IP oder Hostname • Spaltenbreite mit Maus anpassen)</TextBlock>
                                 </StackPanel>
 
                                 <!-- Resizable column headers -->
@@ -116,7 +126,7 @@
                                     <TextBlock Grid.Column="0" Text="Aktiv" Style="{StaticResource PingHeaderText}" />
                                     <GridSplitter Grid.Column="1" Style="{StaticResource ThinSplitter}" />
 
-                                    <TextBlock Grid.Column="2" Text="IP-Adresse" Style="{StaticResource PingHeaderText}" />
+                                    <TextBlock Grid.Column="2" Text="IP / Hostname" Style="{StaticResource PingHeaderText}" />
                                     <GridSplitter Grid.Column="3" Style="{StaticResource ThinSplitter}" />
 
                                     <TextBlock Grid.Column="4" Text="Start" Style="{StaticResource PingHeaderText}" />
@@ -143,7 +153,10 @@
             <TabItem Header="Info">
                 <ScrollViewer Margin="6" VerticalScrollBarVisibility="Auto">
                     <StackPanel Orientation="Horizontal" Margin="6">
-                        <Image x:Name="InfoImage" Width="96" Height="96" Margin="6" Stretch="Uniform" />
+                        <StackPanel Orientation="Vertical" Margin="6" Width="140">
+                            <Image x:Name="InfoImage" Width="96" Height="96" Margin="6" Stretch="Uniform" />
+                            <TextBlock x:Name="InfoVersionText" Margin="6,0,6,0" FontFamily="Consolas" FontSize="11" Foreground="#444" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                        </StackPanel>
                         <StackPanel Orientation="Vertical" Margin="6" Width="380">
                             <TextBlock x:Name="InfoText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Padding="6" />
                         </StackPanel>
@@ -153,7 +166,7 @@
         </TabControl>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="BtnApply" Width="80" Margin="4" Click="BtnApply_Click">Anwenden</Button>
+            <Button x:Name="BtnApply" Width="80" Margin="4" Click="BtnApply_Click" Visibility="Collapsed">Anwenden</Button>
             <Button x:Name="BtnSave" Width="80" Margin="4" Click="BtnSave_Click">Speichern</Button>
             <Button x:Name="BtnCancel" Width="80" Margin="4" Click="BtnClose_Click">Schliessen</Button>
         </StackPanel>

@@ -306,6 +306,23 @@ namespace neTiPx
                 if (sender is TabControl tc && tc.SelectedItem is TabItem ti)
                 {
                     var header = ti.Header?.ToString() ?? string.Empty;
+
+                    if (this.FindName("BtnApply") is Button btnApply)
+                    {
+                        btnApply.Visibility = header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                             header.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
+                    }
+
+                    // Hide "Speichern" button in Info tab
+                    if (this.FindName("BtnSave") is Button btnSave)
+                    {
+                        btnSave.Visibility = header.IndexOf("Info", StringComparison.OrdinalIgnoreCase) >= 0
+                            ? Visibility.Collapsed
+                            : Visibility.Visible;
+                    }
+
                     if (header.IndexOf("Adapter", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         LoadAdapters();
@@ -313,6 +330,97 @@ namespace neTiPx
                     else if (header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         LoadIpSettings();
+                    }
+                    else if (header.IndexOf("Info", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        // Populate Info tab content when selected
+                        try
+                        {
+                            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                            var ver = asm.GetName().Version?.ToString() ?? "?";
+                            if (this.FindName("InfoText") is TextBlock tb)
+                            {
+                                tb.Inlines.Clear();
+                                tb.FontFamily = new System.Windows.Media.FontFamily("Consolas");
+                                tb.FontSize = 12;
+
+                                tb.Inlines.Add(new Run("neTiPx - Netzwerk Infos - by Pedro Tepe"));
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new LineBreak());
+
+                                if (this.FindName("InfoVersionText") is TextBlock vt)
+                                {
+                                    vt.Text = "Version: " + ver;
+                                }
+
+                                tb.Inlines.Add(new Run("Lizenz:"));
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new Run("Dieses Programm steht unter der im Repository angegebenen Lizenz."));
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new LineBreak());
+
+                                tb.Inlines.Add(new Run("Autor:"));
+                                tb.Inlines.Add(new LineBreak());
+                                var email = "github@hometepe.de";
+                                var mailText = "Flecky13 - " + email;
+                                var mailLink = new Hyperlink(new Run(mailText)) { NavigateUri = new Uri("mailto:" + email) };
+                                mailLink.Click += (s2, e2) =>
+                                {
+                                    try { Process.Start(new ProcessStartInfo(mailLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                                };
+                                tb.Inlines.Add(mailLink);
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new LineBreak());
+
+                                tb.Inlines.Add(new Run("Repository:"));
+                                tb.Inlines.Add(new LineBreak());
+                                var repoUrl = "https://github.com/Flecky13/neTiPx-V2";
+                                var repoLink = new Hyperlink(new Run(repoUrl)) { NavigateUri = new Uri(repoUrl) };
+                                repoLink.Click += (s3, e3) =>
+                                {
+                                    try { Process.Start(new ProcessStartInfo(repoLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                                };
+                                tb.Inlines.Add(repoLink);
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new LineBreak());
+
+                                // Support link (BuyMeACoffee)
+                                tb.Inlines.Add(new Run("Support:"));
+                                tb.Inlines.Add(new LineBreak());
+                                var supportUrl = "https://buymeacoffee.com/pedrotepe";
+                                var supportLink = new Hyperlink(new Run(supportUrl)) { NavigateUri = new Uri(supportUrl) };
+                                supportLink.Click += (s4, e4) =>
+                                {
+                                    try { Process.Start(new ProcessStartInfo(supportLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                                };
+                                tb.Inlines.Add(supportLink);
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new LineBreak());
+
+                                tb.Inlines.Add(new Run("Beschreibung:"));
+                                tb.Inlines.Add(new LineBreak());
+                                tb.Inlines.Add(new Run("Kleine Tray-App zur Anzeige von Netzwerk- und IP-Informationen."));
+                            }
+
+                            if (this.FindName("InfoImage") is Image img)
+                            {
+                                try
+                                {
+                                    var imgPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "toolicon_transparent.png");
+                                    if (System.IO.File.Exists(imgPath))
+                                    {
+                                        var bmp = new BitmapImage();
+                                        bmp.BeginInit();
+                                        bmp.UriSource = new Uri(imgPath, UriKind.Absolute);
+                                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                                        bmp.EndInit();
+                                        img.Source = bmp;
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                        catch { }
                     }
                 }
             }
@@ -915,6 +1023,12 @@ namespace neTiPx
             // Create Grid matching header column structure
             var row = new Grid { Margin = new Thickness(0, 1, 0, 1) };
 
+            // Alternierende Hintergrundfarben
+            var bgBrush = (index % 2 == 0)
+                ? TryFindResource("PingRowEvenBg") as SolidColorBrush
+                : TryFindResource("PingRowOddBg") as SolidColorBrush;
+            row.Background = bgBrush ?? new SolidColorBrush(Color.FromRgb(250, 250, 250));
+
             // Copy column definitions from header grid
             for (int i = 0; i < headerGrid.ColumnDefinitions.Count; i++)
             {
@@ -938,8 +1052,8 @@ namespace neTiPx
 
             // per-row action buttons in last column
             var btnPanel = new StackPanel { Orientation = Orientation.Horizontal };
-            var btnReset = new Button { Width = 50, Content = "Reset", Style = TryFindResource("PingActionButton") as Style };
-            var btnDelete = new Button { Width = 30, Content = "🗑", Style = TryFindResource("PingActionButton") as Style };
+            var btnReset = new Button { Width = 50, Content = "↻", ToolTip = "Reset", Style = TryFindResource("PingActionButton") as Style, FontSize = 16, Padding = new Thickness(2,0,2,0) };
+            var btnDelete = new Button { Width = 30, Content = "🗑", ToolTip = "Löschen", Style = TryFindResource("PingActionButton") as Style };
             btnPanel.Children.Add(btnReset);
             btnPanel.Children.Add(btnDelete);
 
@@ -971,17 +1085,19 @@ namespace neTiPx
             txtIp.TextChanged += (s, ev) =>
             {
                 var ip = txtIp.Text.Trim();
-                bool valid = IsValidIPv4(ip);
+                bool valid = IsValidHostOrIP(ip);
                 // disable checkbox if invalid
                 cb.IsEnabled = valid;
                 if (!valid)
                 {
                     cb.IsChecked = false;
-                    txtIp.BorderBrush = Brushes.IndianRed;
+                    txtIp.BorderBrush = new SolidColorBrush(Color.FromRgb(255, 170, 153)); // Dezenteres Rot #FFAA99
+                    txtIp.BorderThickness = new Thickness(1.5);
                 }
                 else
                 {
                     txtIp.BorderBrush = SystemColors.ControlDarkBrush;
+                    txtIp.BorderThickness = new Thickness(1);
                 }
             };
 
@@ -991,9 +1107,9 @@ namespace neTiPx
                 if (EventsSuspended) return;
                 // validate on check
                 var ip = txtIp.Text.Trim();
-                if (!IsValidIPv4(ip))
+                if (!IsValidHostOrIP(ip))
                 {
-                    MessageBox.Show("Ungültige IP-Adresse.");
+                    MessageBox.Show("Ungültige IP-Adresse oder Hostname.");
                     cb.IsChecked = false;
                 }
             };
@@ -1214,7 +1330,7 @@ namespace neTiPx
                             if (p.Enabled != null)
                             {
                                 // set enabled state based on validity (but don't trigger Checked validation during load)
-                                p.Enabled.IsEnabled = IsValidIPv4(ip);
+                                p.Enabled.IsEnabled = IsValidHostOrIP(ip);
                             }
                         }
                         if (values.TryGetValue($"Tools.Ping{i}.Enabled", out var en) && en == "1")
@@ -1338,6 +1454,35 @@ namespace neTiPx
             return false;
         }
 
+        private bool IsValidHostOrIP(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return false;
+
+            // Check if it's a valid IPv4 address
+            if (System.Net.IPAddress.TryParse(input, out var addr))
+            {
+                return addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
+            }
+
+            // Check if it's a valid hostname/DNS name
+            // Valid hostname characters: alphanumeric, hyphen, dot
+            // Must not start/end with hyphen or dot
+            var trimmed = input.Trim();
+            if (trimmed.Length > 253) return false; // Max DNS name length
+            if (trimmed.StartsWith(".") || trimmed.EndsWith(".") || trimmed.StartsWith("-") || trimmed.EndsWith("-")) return false;
+
+            // Split by dots and validate each label
+            var labels = trimmed.Split('.');
+            foreach (var label in labels)
+            {
+                if (string.IsNullOrEmpty(label) || label.Length > 63) return false; // Max label length
+                if (label.StartsWith("-") || label.EndsWith("-")) return false;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(label, @"^[a-zA-Z0-9-]+$")) return false;
+            }
+
+            return true;
+        }
+
         public void SelectIpTab()
         {
             try
@@ -1384,9 +1529,10 @@ namespace neTiPx
                             tb.Inlines.Add(new LineBreak());
                             tb.Inlines.Add(new LineBreak());
 
-                            tb.Inlines.Add(new Run("Version: " + ver));
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new LineBreak());
+                            if (this.FindName("InfoVersionText") is TextBlock vt)
+                            {
+                                vt.Text = "Version: " + ver;
+                            }
 
                             tb.Inlines.Add(new Run("Lizenz:"));
                             tb.Inlines.Add(new LineBreak());
