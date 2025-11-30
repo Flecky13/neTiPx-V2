@@ -8,6 +8,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Diagnostics;
 using System.Windows.Documents;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace neTiPx
 {
@@ -1751,6 +1754,116 @@ namespace neTiPx
             catch { }
         }
 
+            private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
+            {
+                if (sender is Button btn)
+                {
+                    btn.IsEnabled = false;
+                    btn.Content = "Überprüfe...";
+
+                    try
+                    {
+                        var currentVersion = GetCurrentVersion();
+                        var latestRelease = await GetLatestGitHubReleaseAsync();
+
+                        if (latestRelease == null)
+                        {
+                            MessageBox.Show("Konnte Update-Informationen nicht abrufen.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        var latestVersion = ParseVersion(latestRelease.TagName);
+
+                        if (latestVersion > currentVersion)
+                        {
+                            var result = MessageBox.Show(
+                                $"Neue Version verfügbar!\n\n" +
+                                $"Installierte Version: {currentVersion}\n" +
+                                $"Verfügbare Version: {latestVersion}\n\n" +
+                                $"Möchten Sie die neue Version jetzt herunterladen?",
+                                "Update verfügbar",
+                                MessageBoxButton.YesNo,
+                                MessageBoxImage.Information);
+
+                            if (result == MessageBoxResult.Yes)
+                            {
+                                try
+                                {
+                                    Process.Start(new ProcessStartInfo(latestRelease.HtmlUrl) { UseShellExecute = true });
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show($"Fehler beim Öffnen des Browsers: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show(
+                                $"Sie verwenden bereits die neueste Version.\n\nVersion: {currentVersion}",
+                                "Auf dem neuesten Stand",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Information);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Fehler bei der Update-Überprüfung: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    finally
+                    {
+                        btn.Content = "Nach Updates suchen";
+                        btn.IsEnabled = true;
+                    }
+                }
+            }
+
+            private Version GetCurrentVersion()
+            {
+                var asm = System.Reflection.Assembly.GetExecutingAssembly();
+                return asm.GetName().Version ?? new Version(0, 0, 0, 0);
+            }
+
+            private Version ParseVersion(string tagName)
+            {
+                // Remove 'v' prefix if present (e.g., "v1.6.1.1" -> "1.6.1.1")
+                var versionString = tagName.TrimStart('v', 'V');
+
+                if (Version.TryParse(versionString, out var version))
+                {
+                    return version;
+                }
+
+                return new Version(0, 0, 0, 0);
+            }
+
+            private async Task<GitHubRelease?> GetLatestGitHubReleaseAsync()
+            {
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateChecker");
+                    client.Timeout = TimeSpan.FromSeconds(10);
+
+                    var url = "https://api.github.com/repos/Flecky13/neTiPx-V2/releases/latest";
+                    var response = await client.GetStringAsync(url);
+
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+
+                    return JsonSerializer.Deserialize<GitHubRelease>(response, options);
+                }
+            }
+
+            private class GitHubRelease
+            {
+                public string TagName { get; set; } = string.Empty;
+                public string Name { get; set; } = string.Empty;
+                public string HtmlUrl { get; set; } = string.Empty;
+                public bool Prerelease { get; set; }
+                public bool Draft { get; set; }
+            }
 
     }
 }
