@@ -1604,6 +1604,28 @@ namespace neTiPx
             return true;
         }
 
+        public void SelectAdapterTab()
+        {
+            try
+            {
+                if (this.FindName("TabControlMain") is TabControl tc)
+                {
+                    EnterSuspendEvents();
+                    try
+                    {
+                        tc.SelectedIndex = 0;
+                        // Ensure adapters are loaded
+                        LoadAdapters();
+                    }
+                    finally
+                    {
+                        ExitSuspendEvents();
+                    }
+                }
+            }
+            catch { }
+        }
+
         public void SelectIpTab()
         {
             try
@@ -1635,8 +1657,8 @@ namespace neTiPx
                     EnterSuspendEvents();
                     try
                     {
-                        // Info tab is the third static tab (index 2)
-                        tc.SelectedIndex = 2;
+                        // Info tab is the fourth tab (index 3: 0=Adapter, 1=IP Settings, 2=Tools, 3=Info)
+                        tc.SelectedIndex = 3;
 
                         var asm = System.Reflection.Assembly.GetExecutingAssembly();
                         var ver = asm.GetName().Version?.ToString() ?? "?";
@@ -1692,6 +1714,19 @@ namespace neTiPx
                                 catch { }
                             };
                             tb.Inlines.Add(repoLink);
+                            tb.Inlines.Add(new LineBreak());
+                            tb.Inlines.Add(new LineBreak());
+
+                            // Support link (BuyMeACoffee)
+                            tb.Inlines.Add(new Run("Support:"));
+                            tb.Inlines.Add(new LineBreak());
+                            var supportUrl = "https://buymeacoffee.com/pedrotepe";
+                            var supportLink = new Hyperlink(new Run(supportUrl)) { NavigateUri = new Uri(supportUrl) };
+                            supportLink.Click += (s4, e4) =>
+                            {
+                                try { Process.Start(new ProcessStartInfo(supportLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                            };
+                            tb.Inlines.Add(supportLink);
                             tb.Inlines.Add(new LineBreak());
                             tb.Inlines.Add(new LineBreak());
 

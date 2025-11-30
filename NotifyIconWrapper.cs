@@ -227,7 +227,7 @@ namespace neTiPx
 
         private ContextMenuStrip CreateContextMenu()
         {
-            var configItem = new ToolStripMenuItem("Config");
+            var configItem = new ToolStripMenuItem("Adapter");
             configItem.Click += ConfigItemOnClick;
 
             var ipItem = new ToolStripMenuItem("IP Settings");

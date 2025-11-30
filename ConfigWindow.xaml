@@ -1,7 +1,7 @@
 <Window x:Class="neTiPx.ConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Config" Height="420" Width="650" WindowStartupLocation="CenterScreen">
+        Title="neTiPx - Netwerk Infos - Configuration" Height="420" Width="650" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <!-- Gemeinsame Styles für Ping-Header und Zellen -->
         <Style x:Key="PingHeaderText" TargetType="TextBlock">
