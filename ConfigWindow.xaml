@@ -162,6 +162,7 @@
                         </StackPanel>
                         <StackPanel Orientation="Vertical" Margin="6" Width="380">
                             <TextBlock x:Name="InfoText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Padding="6" />
+                                <Button x:Name="BtnCheckUpdate" Width="180" Margin="6,12,6,6" Click="BtnCheckUpdate_Click">Nach Updates suchen</Button>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
