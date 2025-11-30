@@ -28,6 +28,8 @@ namespace neTiPx
         private const int MaxPingEntries = 6;
         private const int PingTimeoutMs = 2000;
         private readonly List<PingEntryData> _pingEntries = new List<PingEntryData>();
+        private bool _keepPingTimersRunning = false;
+        private bool _hasAskedAboutPingTimers = false;
 
         private class PingEntryData
         {
@@ -306,13 +308,12 @@ namespace neTiPx
                 if (sender is TabControl tc && tc.SelectedItem is TabItem ti)
                 {
                     var header = ti.Header?.ToString() ?? string.Empty;
+                    bool isIpSettingsTab = header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                          header.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0;
 
                     if (this.FindName("BtnApply") is Button btnApply)
                     {
-                        btnApply.Visibility = header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                                             header.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0
-                            ? Visibility.Visible
-                            : Visibility.Collapsed;
+                        btnApply.Visibility = isIpSettingsTab ? Visibility.Visible : Visibility.Collapsed;
                     }
 
                     // Hide "Speichern" button in Info tab
@@ -323,13 +324,82 @@ namespace neTiPx
                             : Visibility.Visible;
                     }
 
+                    // Stop all IP tab gateway ping timers when leaving IP Settings tab
+                    if (!isIpSettingsTab)
+                    {
+                        foreach (var t in _ipTabs)
+                        {
+                            try { t.PingTimer?.Stop(); } catch { }
+                        }
+                    }
+
+                    // Check if leaving Tools/Ping tab
+                    bool isToolsTab = header.IndexOf("Tools", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!isToolsTab && !_hasAskedAboutPingTimers)
+                    {
+                        // Check if any ping timers are running
+                        bool anyPingRunning = _pingEntries.Any(p => p.Timer != null && p.Timer.IsEnabled);
+                        if (anyPingRunning)
+                        {
+                            // Only ask if background mode is enabled
+                            if (_keepPingTimersRunning)
+                            {
+                                _hasAskedAboutPingTimers = true;
+                                var result = MessageBox.Show(
+                                    "Soll die Erreichbarkeitsprüfung (Ping) im Hintergrund weiterlaufen?",
+                                    "Ping-Überwachung",
+                                    MessageBoxButton.YesNo,
+                                    MessageBoxImage.Question);
+                                _keepPingTimersRunning = (result == MessageBoxResult.Yes);
+
+                                // Update checkbox to reflect user decision
+                                UpdatePingBackgroundCheckbox();
+                            }
+
+                            if (!_keepPingTimersRunning)
+                            {
+                                // Stop all ping timers
+                                foreach (var p in _pingEntries)
+                                {
+                                    try { p.Timer?.Stop(); } catch { }
+                                }
+                            }
+                        }
+                    }
+                    else if (isToolsTab)
+                    {
+                        // Reset flag when returning to Tools tab
+                        _hasAskedAboutPingTimers = false;
+
+                        // Always restart ping timers for enabled entries when returning to tab
+                        foreach (var p in _pingEntries)
+                        {
+                            if (p.Enabled != null && p.Enabled.IsChecked == true && p.Timer != null && !p.Timer.IsEnabled)
+                            {
+                                try { p.Timer.Start(); } catch { }
+                            }
+                        }
+
+                        // Update checkbox status
+                        UpdatePingBackgroundCheckbox();
+                    }
+
                     if (header.IndexOf("Adapter", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         LoadAdapters();
                     }
-                    else if (header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0)
+                    else if (isIpSettingsTab)
                     {
                         LoadIpSettings();
+                        // Restart timer for currently selected IP tab after loading
+                        if (this.FindName("IpTabsControl") is TabControl ipTabCtrl && ipTabCtrl.SelectedItem is TabItem selectedIpTab)
+                        {
+                            var selectedData = _ipTabs.FirstOrDefault(t => t.Tab == selectedIpTab);
+                            if (selectedData != null)
+                            {
+                                StartGatewayPingTimer(selectedData);
+                            }
+                        }
                     }
                     else if (header.IndexOf("Info", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
@@ -1241,6 +1311,52 @@ namespace neTiPx
             try { timer.Start(); } catch { }
         }
 
+        private void ChkPingBackground_Changed(object sender, RoutedEventArgs e)
+        {
+            if (EventsSuspended) return;
+
+            if (this.FindName("ChkPingBackground") is CheckBox chk)
+            {
+                _keepPingTimersRunning = chk.IsChecked == true;
+
+                if (!_keepPingTimersRunning)
+                {
+                    // Stop all ping timers
+                    foreach (var p in _pingEntries)
+                    {
+                        try { p.Timer?.Stop(); } catch { }
+                    }
+                }
+                else
+                {
+                    // Start ping timers for enabled entries
+                    foreach (var p in _pingEntries)
+                    {
+                        if (p.Enabled != null && p.Enabled.IsChecked == true && p.Timer != null)
+                        {
+                            try { p.Timer.Start(); } catch { }
+                        }
+                    }
+                }
+            }
+        }
+
+        private void UpdatePingBackgroundCheckbox()
+        {
+            if (this.FindName("ChkPingBackground") is CheckBox chk)
+            {
+                EnterSuspendEvents();
+                try
+                {
+                    chk.IsChecked = _keepPingTimersRunning;
+                }
+                finally
+                {
+                    ExitSuspendEvents();
+                }
+            }
+        }
+
         private void BtnAddPingEntry_Click(object sender, RoutedEventArgs e)
         {
             if (_pingEntries.Count >= MaxPingEntries)
@@ -1333,10 +1449,8 @@ namespace neTiPx
                                 p.Enabled.IsEnabled = IsValidHostOrIP(ip);
                             }
                         }
-                        if (values.TryGetValue($"Tools.Ping{i}.Enabled", out var en) && en == "1")
-                        {
-                            if (p.Enabled != null) p.Enabled.IsChecked = true;
-                        }
+                        // Always start with disabled pings (user must manually enable after app start)
+                        if (p.Enabled != null) p.Enabled.IsChecked = false;
                             // no per-entry timeout to load (fixed timeout used)
                 }
             }
@@ -1369,77 +1483,84 @@ namespace neTiPx
                     var data = _ipTabs.FirstOrDefault(t => t.Tab == ti);
                     if (data != null)
                     {
-                        // Ensure existing timer stopped
-                        try { data.PingTimer?.Stop(); } catch { }
-
-                        var timer = new System.Windows.Threading.DispatcherTimer();
-                        timer.Interval = TimeSpan.FromSeconds(3);
-                        timer.Tick += async (s, ev) =>
-                        {
-                                try
-                                {
-                                    // Always use the current gateway of the selected network interface
-                                    var selAdapter = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
-                                    string gw = string.Empty;
-                                    if (!string.IsNullOrEmpty(selAdapter))
-                                    {
-                                        var sys = GetSystemIpv4Settings(selAdapter);
-                                        if (sys != null) gw = sys.Value.gateway ?? string.Empty;
-                                    }
-
-                                    if (string.IsNullOrEmpty(gw))
-                                    {
-                                        // update label to unknown (no gateway found on NIC)
-                                        data.LblGwStatus?.Dispatcher.Invoke(() =>
-                                        {
-                                            if (data.LblGwStatus != null)
-                                            {
-                                                data.LblGwStatus.Content = "GW: -";
-                                                data.LblGwStatus.Background = Brushes.LightGray;
-                                            }
-                                        });
-                                        return;
-                                    }
-
-                                    using var p = new System.Net.NetworkInformation.Ping();
-                                    try
-                                    {
-                                        var reply = await p.SendPingAsync(gw, 2000);
-                                        data.LblGwStatus?.Dispatcher.Invoke(() =>
-                                        {
-                                            if (data.LblGwStatus == null) return;
-                                            if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
-                                            {
-                                                data.LblGwStatus.Content = $"GW: {gw} ({reply.RoundtripTime} ms)";
-                                                data.LblGwStatus.Background = Brushes.LightGreen;
-                                            }
-                                            else
-                                            {
-                                                data.LblGwStatus.Content = $"GW: {gw} (no reply)";
-                                                data.LblGwStatus.Background = Brushes.IndianRed;
-                                            }
-                                        });
-                                    }
-                                    catch
-                                    {
-                                        data.LblGwStatus?.Dispatcher.Invoke(() =>
-                                        {
-                                            if (data.LblGwStatus == null) return;
-                                            data.LblGwStatus.Content = $"GW: {gw} (error)";
-                                            data.LblGwStatus.Background = Brushes.IndianRed;
-                                        });
-                                    }
-                                }
-                            catch { }
-                        };
-
-                        data.PingTimer = timer;
-                        // run immediately then start
-                        try { timer.Start(); } catch { }
-                        // trigger immediate tick once
-                        timer.Dispatcher.InvokeAsync(async () => await System.Threading.Tasks.Task.Run(() => { /* immediate start handled by Tick after Start */ }));
+                        StartGatewayPingTimer(data);
                     }
                 }
+            }
+            catch { }
+        }
+
+        private void StartGatewayPingTimer(IpTabData data)
+        {
+            try
+            {
+                // Ensure existing timer stopped
+                try { data.PingTimer?.Stop(); } catch { }
+
+                var timer = new System.Windows.Threading.DispatcherTimer();
+                timer.Interval = TimeSpan.FromSeconds(3);
+                timer.Tick += async (s, ev) =>
+                {
+                    try
+                    {
+                        // Always use the current gateway of the selected network interface
+                        var selAdapter = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+                        string gw = string.Empty;
+                        if (!string.IsNullOrEmpty(selAdapter))
+                        {
+                            var sys = GetSystemIpv4Settings(selAdapter);
+                            if (sys != null) gw = sys.Value.gateway ?? string.Empty;
+                        }
+
+                        if (string.IsNullOrEmpty(gw))
+                        {
+                            // update label to unknown (no gateway found on NIC)
+                            data.LblGwStatus?.Dispatcher.Invoke(() =>
+                            {
+                                if (data.LblGwStatus != null)
+                                {
+                                    data.LblGwStatus.Content = "GW: -";
+                                    data.LblGwStatus.Background = Brushes.LightGray;
+                                }
+                            });
+                            return;
+                        }
+
+                        using var p = new System.Net.NetworkInformation.Ping();
+                        try
+                        {
+                            var reply = await p.SendPingAsync(gw, 2000);
+                            data.LblGwStatus?.Dispatcher.Invoke(() =>
+                            {
+                                if (data.LblGwStatus == null) return;
+                                if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
+                                {
+                                    data.LblGwStatus.Content = $"GW: {gw} ({reply.RoundtripTime} ms)";
+                                    data.LblGwStatus.Background = Brushes.LightGreen;
+                                }
+                                else
+                                {
+                                    data.LblGwStatus.Content = $"GW: {gw} (no reply)";
+                                    data.LblGwStatus.Background = Brushes.IndianRed;
+                                }
+                            });
+                        }
+                        catch
+                        {
+                            data.LblGwStatus?.Dispatcher.Invoke(() =>
+                            {
+                                if (data.LblGwStatus == null) return;
+                                data.LblGwStatus.Content = $"GW: {gw} (error)";
+                                data.LblGwStatus.Background = Brushes.IndianRed;
+                            });
+                        }
+                    }
+                    catch { }
+                };
+
+                data.PingTimer = timer;
+                // run immediately then start
+                try { timer.Start(); } catch { }
             }
             catch { }
         }

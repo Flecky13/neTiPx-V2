@@ -102,6 +102,9 @@
                                 <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
                                     <Button x:Name="BtnAddPingEntry" Width="110" Margin="2" Click="BtnAddPingEntry_Click">Ping hinzufügen</Button>
                                     <Button x:Name="BtnResetAllPingEntries" Width="110" Margin="2" Click="BtnResetAllPingEntries_Click">Reset Alle</Button>
+                                    <CheckBox x:Name="ChkPingBackground" Margin="10,2,2,2" VerticalAlignment="Center" Checked="ChkPingBackground_Changed" Unchecked="ChkPingBackground_Changed">
+                                        <TextBlock Text="Im Hintergrund weiterlaufen" FontWeight="Normal" />
+                                    </CheckBox>
                                     <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(max. 6 • IP oder Hostname • Spaltenbreite mit Maus anpassen)</TextBlock>
                                 </StackPanel>
 
