@@ -156,13 +156,13 @@
             <TabItem Header="Info">
                 <ScrollViewer Margin="6" VerticalScrollBarVisibility="Auto">
                     <StackPanel Orientation="Horizontal" Margin="6">
-                        <StackPanel Orientation="Vertical" Margin="6" Width="140">
+                        <StackPanel Orientation="Vertical" Margin="6" Width="200">
                             <Image x:Name="InfoImage" Width="96" Height="96" Margin="6" Stretch="Uniform" />
                             <TextBlock x:Name="InfoVersionText" Margin="6,0,6,0" FontFamily="Consolas" FontSize="11" Foreground="#444" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                            <Button x:Name="BtnCheckUpdate" Width="140" Margin="6,12,6,6" Click="BtnCheckUpdate_Click" HorizontalAlignment="Center">Nach Updates suchen</Button>
                         </StackPanel>
-                        <StackPanel Orientation="Vertical" Margin="6" Width="380">
+                        <StackPanel Orientation="Vertical" Margin="6" Width="320">
                             <TextBlock x:Name="InfoText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Padding="6" />
-                                <Button x:Name="BtnCheckUpdate" Width="180" Margin="6,12,6,6" Click="BtnCheckUpdate_Click">Nach Updates suchen</Button>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

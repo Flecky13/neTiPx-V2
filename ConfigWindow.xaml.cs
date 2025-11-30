@@ -1791,27 +1791,41 @@ namespace neTiPx
 
             private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
             {
+                Trace.WriteLine("[UpdateCheck] ========== Update-Check gestartet ==========");
+                Console.WriteLine("[UpdateCheck] ========== Update-Check gestartet ==========");
+
                 if (sender is Button btn)
                 {
                     btn.IsEnabled = false;
                     btn.Content = "Überprüfe...";
 
-                    try
+                try
+                {
+                    var currentVersion = GetCurrentVersion();
+                    Trace.WriteLine($"[UpdateCheck] Aktuelle Version: {currentVersion}");
+                    Console.WriteLine($"[UpdateCheck] Aktuelle Version: {currentVersion}");
+
+                    var latestRelease = await GetLatestGitHubReleaseAsync();
+
+                    if (latestRelease == null)
                     {
-                        var currentVersion = GetCurrentVersion();
-                        var latestRelease = await GetLatestGitHubReleaseAsync();
+                        Trace.WriteLine("[UpdateCheck] Fehler: Konnte keine Release-Informationen abrufen");
+                        Console.WriteLine("[UpdateCheck] Fehler: Konnte keine Release-Informationen abrufen");
+                        MessageBox.Show("Konnte Update-Informationen nicht abrufen.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
 
-                        if (latestRelease == null)
-                        {
-                            MessageBox.Show("Konnte Update-Informationen nicht abrufen.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
-                        }
+                    Trace.WriteLine($"[UpdateCheck] GitHub Tag: {latestRelease.TagName}");
+                    Console.WriteLine($"[UpdateCheck] GitHub Tag: {latestRelease.TagName}");
+                    var latestVersion = ParseVersion(latestRelease.TagName);
+                    Trace.WriteLine($"[UpdateCheck] Geparste Version: {latestVersion}");
+                    Console.WriteLine($"[UpdateCheck] Geparste Version: {latestVersion}");
 
-                        var latestVersion = ParseVersion(latestRelease.TagName);
-
-                        if (latestVersion > currentVersion)
-                        {
-                            var result = MessageBox.Show(
+                    if (latestVersion > currentVersion)
+                    {
+                        Trace.WriteLine($"[UpdateCheck] Neue Version verfügbar: {latestVersion} > {currentVersion}");
+                        Console.WriteLine($"[UpdateCheck] Neue Version verfügbar: {latestVersion} > {currentVersion}");
+                        var result = MessageBox.Show(
                                 $"Neue Version verfügbar!\n\n" +
                                 $"Installierte Version: {currentVersion}\n" +
                                 $"Verfügbare Version: {latestVersion}\n\n" +
@@ -1834,6 +1848,8 @@ namespace neTiPx
                         }
                         else
                         {
+                            Trace.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
+                            Console.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
                             MessageBox.Show(
                                 $"Sie verwenden bereits die neueste Version.\n\nVersion: {currentVersion}",
                                 "Auf dem neuesten Stand",
@@ -1843,6 +1859,10 @@ namespace neTiPx
                     }
                     catch (Exception ex)
                     {
+                        Trace.WriteLine($"[UpdateCheck] Fehler: {ex.Message}");
+                        Console.WriteLine($"[UpdateCheck] Fehler: {ex.Message}");
+                        Trace.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                        Console.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
                         MessageBox.Show($"Fehler bei der Update-Überprüfung: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                     finally
@@ -1859,46 +1879,72 @@ namespace neTiPx
                 return asm.GetName().Version ?? new Version(0, 0, 0, 0);
             }
 
-            private Version ParseVersion(string tagName)
+        private Version ParseVersion(string tagName)
+        {
+            // Remove 'v' prefix if present (e.g., "v1.6.1.1" -> "1.6.1.1")
+            var versionString = tagName.TrimStart('v', 'V');
+            Trace.WriteLine($"[UpdateCheck] Parse Version - Input: '{tagName}' -> Bereinigt: '{versionString}'");
+            Console.WriteLine($"[UpdateCheck] Parse Version - Input: '{tagName}' -> Bereinigt: '{versionString}'");
+
+            if (Version.TryParse(versionString, out var version))
             {
-                // Remove 'v' prefix if present (e.g., "v1.6.1.1" -> "1.6.1.1")
-                var versionString = tagName.TrimStart('v', 'V');
-
-                if (Version.TryParse(versionString, out var version))
-                {
-                    return version;
-                }
-
-                return new Version(0, 0, 0, 0);
+                Trace.WriteLine($"[UpdateCheck] Parse Version - Erfolgreich: {version}");
+                Console.WriteLine($"[UpdateCheck] Parse Version - Erfolgreich: {version}");
+                return version;
             }
 
-            private async Task<GitHubRelease?> GetLatestGitHubReleaseAsync()
+            Trace.WriteLine($"[UpdateCheck] Parse Version - Fehler beim Parsen von '{versionString}'");
+            Console.WriteLine($"[UpdateCheck] Parse Version - Fehler beim Parsen von '{versionString}'");
+            return new Version(0, 0, 0, 0);
+        }
+
+        private async Task<GitHubRelease?> GetLatestGitHubReleaseAsync()
+        {
+            using (var client = new HttpClient())
             {
-                using (var client = new HttpClient())
-                {
-                    client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateChecker");
-                    client.Timeout = TimeSpan.FromSeconds(10);
+                client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateChecker");
+                client.Timeout = TimeSpan.FromSeconds(10);
 
-                    var url = "https://api.github.com/repos/Flecky13/neTiPx-V2/releases/latest";
-                    var response = await client.GetStringAsync(url);
+                var url = "https://api.github.com/repos/Flecky13/neTiPx-V2/releases/latest";
+                Trace.WriteLine($"[UpdateCheck] Rufe GitHub API ab: {url}");
+                Console.WriteLine($"[UpdateCheck] Rufe GitHub API ab: {url}");
+                var response = await client.GetStringAsync(url);
+                Trace.WriteLine($"[UpdateCheck] API Antwort erhalten (Länge: {response.Length} Zeichen)");
+                Console.WriteLine($"[UpdateCheck] API Antwort erhalten (Länge: {response.Length} Zeichen)");
 
-                    var options = new JsonSerializerOptions
+                var options = new JsonSerializerOptions
                     {
-                        PropertyNameCaseInsensitive = true
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                     };
 
-                    return JsonSerializer.Deserialize<GitHubRelease>(response, options);
+                    var release = JsonSerializer.Deserialize<GitHubRelease>(response, options);
+
+                    if (release != null)
+                    {
+                        Trace.WriteLine($"[UpdateCheck] Deserialisiert - TagName: '{release.TagName}', Name: '{release.Name}'");
+                        Console.WriteLine($"[UpdateCheck] Deserialisiert - TagName: '{release.TagName}', Name: '{release.Name}'");
+                    }
+
+                    return release;
                 }
             }
 
-            private class GitHubRelease
-            {
-                public string TagName { get; set; } = string.Empty;
-                public string Name { get; set; } = string.Empty;
-                public string HtmlUrl { get; set; } = string.Empty;
-                public bool Prerelease { get; set; }
-                public bool Draft { get; set; }
-            }
+        private class GitHubRelease
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("tag_name")]
+            public string TagName { get; set; } = string.Empty;
 
-    }
+            [System.Text.Json.Serialization.JsonPropertyName("name")]
+            public string Name { get; set; } = string.Empty;
+
+            [System.Text.Json.Serialization.JsonPropertyName("html_url")]
+            public string HtmlUrl { get; set; } = string.Empty;
+
+            [System.Text.Json.Serialization.JsonPropertyName("prerelease")]
+            public bool Prerelease { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("draft")]
+            public bool Draft { get; set; }
+        }    }
 }
