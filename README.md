@@ -4,17 +4,47 @@
 
 Kurze Beschreibung
 -------------------
-`neTiPx` ist ein kleines Windows-Tool (WPF, C#), das Netzwerkadapter aus einer Konfigurationsdatei lädt, deren Status anzeigt und einfache IP-Konfigurationen verwalten kann. Die App zeigt u. a. externe IPv4-Adresse, lokale IPv4-/IPv6-Adressen, MAC-Adresse, Gateway und DNS-Server an.
+`neTiPx` ist ein kleines Windows-Tool (WPF, C#), das Netzwerkadapter aus einer Konfigurationsdatei lädt, deren Status anzeigt und einfache IP-Konfigurationen verwalten kann. Die App läuft im System Tray und zeigt u. a. externe IPv4-Adresse, lokale IPv4-/IPv6-Adressen, MAC-Adresse, Gateway und DNS-Server an.
 
 Wesentliche Funktionen
 ----------------------
-- Anzeige von Netzwerkdetails pro Adapter (Name, MAC, IPs, Gateways, DNS)
-- Ermittlung der externen IPv4-Adresse über mehrere Fallback-Dienste
-- Auswahl von bis zu zwei physikalischen Adaptern über Config
-- IP-Profile: mehrere vordefinierbare IP-Konfigurationen als Tabs (DHCP oder manuell)
-- Anwenden einer IP-Konfiguration auf eine Netzwerkkarte (führt `netsh` aus, erfordert Administratorrechte)
 
-Konfiguration (`config`)
+### Netzwerk-Übersicht (Tray-Popup)
+- **Automatische Anzeige** bei Mausüberfahrt über das Tray-Icon
+- Anzeige der **externen IPv4-Adresse** (mit Fallback-Diensten)
+- Details zu **zwei konfigurierbaren Netzwerkadaptern**:
+  - Name, MAC-Adresse
+  - IPv4/IPv6-Adressen
+  - Gateway (IPv4/IPv6)
+  - DNS-Server
+
+### Adapter-Auswahl
+- Auswahl von **bis zu 2 physikalischen Netzwerkadaptern**
+- Automatische Erkennung aller verfügbaren Adapter
+
+### IP-Profil-Verwaltung
+- **Mehrere IP-Konfigurationen** als separate Tabs (max. 10)
+- Jedes Profil mit editierbarem Namen
+- **Modus-Auswahl**: DHCP oder Manuell (IPv4)
+- Bei manueller Konfiguration: IP, Subnetz, Gateway, DNS
+- **Gateway-Erreichbarkeitsprüfung**
+  - Zeigt Ping-Status mit RTT in ms
+- **Ein-Klick-Anwendung** auf Netzwerkkarte (erfordert Admin-Rechte)
+
+### Ping-Monitor (Tools → Ping)
+- **Bis zu 6 gleichzeitige Ping-Überwachungen**
+- Unterstützt **IPv4-Adressen UND DNS-Hostnamen** (z.B. google.com)
+- Pro Eintrag:
+  - Aktivierung per Checkbox
+  - Eingabe: IP-Adresse oder Hostname
+  - Live-Statistiken: Startzeit, fehlende Pakete, Paketverlust %, aktueller Status
+  - RTT-Anzeige in ms bei erfolgreichen Pings
+  - Reset-Funktion (↻) und Löschen-Funktion pro Zeile
+- **Hintergrund-Modus**:
+  - Im Hintergrund Ping-Überwachung weiterlaufen
+
+Konfiguration (`config.ini`)
+---------------------------
 ---------------------------
 Die App liest und speicher alles in `config.ini` aus dem Anwendungsverzeichnis. Beispiel:
 
@@ -31,7 +61,6 @@ Office.DNS = 8.8.8.8
 ```
 ![Alt text](Images/Config.png)
 
-Hinweis: Die Werte in `Adapter1`/`Adapter2` sollten den `NetConnectionID`-Namen der Adapter entsprechen (z. B. "Ethernet", "WLAN" oder die Anzeige "Name - Description", je nach System).
 
 IP Settings (Config-Fenster)
 ---------------------------
