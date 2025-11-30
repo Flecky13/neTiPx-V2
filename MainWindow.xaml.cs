@@ -11,6 +11,7 @@ namespace neTiPx
     {
         private DateTime _suppressShowUntil = DateTime.MinValue;
         private readonly TimeSpan _suppressDuration = TimeSpan.FromSeconds(5);
+        private ConfigWindow? _activeConfigWindow = null;
         // Internet- / Timer-Logik wurde ins ViewModel verschoben
 
         public MainWindow()
@@ -33,12 +34,7 @@ namespace neTiPx
                 {
                     try
                     {
-                        // Verstecken und Config-Fenster öffnen
-                        this.Hide();
-                        var cfg = new ConfigWindow();
-                        cfg.Owner = this;
-                        cfg.ShowDialog();
-                        // nach Schließen: verbleiben hidden (App im Tray)
+                        OpenOrFocusConfigWindow(tab => tab.SelectAdapterTab());
                     }
                     catch (Exception ex)
                     {
@@ -49,12 +45,7 @@ namespace neTiPx
                 {
                     try
                     {
-                        // Verstecken und Config-Fenster öffnen auf Info-Tab
-                        this.Hide();
-                        var cfg = new ConfigWindow();
-                        cfg.Owner = this;
-                        try { cfg.GetType().GetMethod("SelectInfoTab")?.Invoke(cfg, null); } catch { }
-                        cfg.ShowDialog();
+                        OpenOrFocusConfigWindow(tab => tab.SelectInfoTab());
                     }
                     catch (Exception ex)
                     {
@@ -65,13 +56,7 @@ namespace neTiPx
                 {
                     try
                     {
-                        // Verstecken und Config-Fenster öffnen direkt auf IP-Tab
-                        this.Hide();
-                        var cfg = new ConfigWindow();
-                        cfg.Owner = this;
-                        // select IP tab if possible
-                        try { cfg.GetType().GetMethod("SelectIpTab")?.Invoke(cfg, null); } catch { }
-                        cfg.ShowDialog();
+                        OpenOrFocusConfigWindow(tab => tab.SelectIpTab());
                     }
                     catch (Exception ex)
                     {
@@ -82,11 +67,7 @@ namespace neTiPx
                 {
                     try
                     {
-                        this.Hide();
-                        var cfg = new ConfigWindow();
-                        cfg.Owner = this;
-                        try { cfg.GetType().GetMethod("SelectToolsTab")?.Invoke(cfg, null); } catch { }
-                        cfg.ShowDialog();
+                        OpenOrFocusConfigWindow(tab => tab.SelectToolsTab());
                     }
                     catch (Exception ex)
                     {
@@ -230,6 +211,63 @@ namespace neTiPx
         private void Window_Closed(object? sender, EventArgs? e)
         {
             Debug.WriteLine("[MainWindow] Window_Closed");
+        }
+
+        private void OpenOrFocusConfigWindow(Action<ConfigWindow>? selectTab = null)
+        {
+            // Prüfen ob ConfigWindow bereits geöffnet ist
+            if (_activeConfigWindow != null && _activeConfigWindow.IsLoaded)
+            {
+                try
+                {
+                    // Fenster in den Vordergrund bringen
+                    if (_activeConfigWindow.WindowState == WindowState.Minimized)
+                    {
+                        _activeConfigWindow.WindowState = WindowState.Normal;
+                    }
+
+                    // Topmost kurz setzen um sicherzustellen dass Fenster in den Vordergrund kommt
+                    _activeConfigWindow.Topmost = true;
+                    _activeConfigWindow.Topmost = false;
+
+                    _activeConfigWindow.Activate();
+                    _activeConfigWindow.Focus();
+
+                    // Tab wechseln falls gewünscht
+                    selectTab?.Invoke(_activeConfigWindow);
+
+                    Debug.WriteLine("[MainWindow] ConfigWindow bereits offen - fokussiert und Tab gewechselt");
+                    return;
+                }
+                catch
+                {
+                    _activeConfigWindow = null;
+                }
+            }
+
+            // Neues ConfigWindow erstellen
+            this.Hide();
+            var cfg = new ConfigWindow();
+            cfg.Owner = this;
+            _activeConfigWindow = cfg;
+
+            // Cleanup wenn Fenster geschlossen wird
+            cfg.Closed += (s, e) =>
+            {
+                _activeConfigWindow = null;
+                Debug.WriteLine("[MainWindow] ConfigWindow geschlossen");
+            };
+
+            // Tab-Auswahl nach Laden
+            if (selectTab != null)
+            {
+                cfg.Loaded += (s, e) =>
+                {
+                    try { selectTab(cfg); } catch { }
+                };
+            }
+
+            cfg.ShowDialog();
         }
 
         // Netzwerk- und IP-Aktualisierung wurde ins ViewModel verschoben
