@@ -1920,7 +1920,7 @@ namespace neTiPx
                 // Create batch file to replace app and start new version
                 var batchPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "neTiPx_UpdateInstaller.bat");
                 var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var currentExeDir = System.IO.Path.GetDirectoryName(currentExePath);
+                var currentExeDir = System.IO.Path.GetDirectoryName(currentExePath) ?? AppDomain.CurrentDomain.BaseDirectory;
                 var backupPath = System.IO.Path.Combine(currentExeDir, "neTiPx.exe.backup");
 
                 var batchContent = $@"@echo off
@@ -1995,35 +1995,89 @@ del /q ""%~f0""
 
         private async Task<GitHubRelease?> GetLatestGitHubReleaseAsync()
         {
-            using (var client = new HttpClient())
+            try
             {
-                client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateChecker");
-                client.Timeout = TimeSpan.FromSeconds(10);
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateChecker");
+                    client.Timeout = TimeSpan.FromSeconds(10);
 
-                var url = "https://api.github.com/repos/Flecky13/neTiPx-V2/releases/latest";
-                Trace.WriteLine($"[UpdateCheck] Rufe GitHub API ab: {url}");
-                Console.WriteLine($"[UpdateCheck] Rufe GitHub API ab: {url}");
-                var response = await client.GetStringAsync(url);
-                Trace.WriteLine($"[UpdateCheck] API Antwort erhalten (Länge: {response.Length} Zeichen)");
-                Console.WriteLine($"[UpdateCheck] API Antwort erhalten (Länge: {response.Length} Zeichen)");
+                    var url = "https://api.github.com/repos/Flecky13/neTiPx-V2/releases/latest";
+                    Trace.WriteLine($"[UpdateCheck] Rufe GitHub API ab: {url}");
+                    Console.WriteLine($"[UpdateCheck] Rufe GitHub API ab: {url}");
 
-                var options = new JsonSerializerOptions
+                    try
                     {
-                        PropertyNameCaseInsensitive = true,
-                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                    };
+                        var response = await client.GetStringAsync(url);
+                        Trace.WriteLine($"[UpdateCheck] API Antwort erhalten (Länge: {response.Length} Zeichen)");
+                        Console.WriteLine($"[UpdateCheck] API Antwort erhalten (Länge: {response.Length} Zeichen)");
 
-                    var release = JsonSerializer.Deserialize<GitHubRelease>(response, options);
+                        var options = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                        };
 
-                    if (release != null)
-                    {
-                        Trace.WriteLine($"[UpdateCheck] Deserialisiert - TagName: '{release.TagName}', Name: '{release.Name}'");
-                        Console.WriteLine($"[UpdateCheck] Deserialisiert - TagName: '{release.TagName}', Name: '{release.Name}'");
+                        var release = JsonSerializer.Deserialize<GitHubRelease>(response, options);
+
+                        if (release != null)
+                        {
+                            Trace.WriteLine($"[UpdateCheck] Deserialisiert - TagName: '{release.TagName}', Name: '{release.Name}'");
+                            Console.WriteLine($"[UpdateCheck] Deserialisiert - TagName: '{release.TagName}', Name: '{release.Name}'");
+                        }
+
+                        return release;
                     }
+                    catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        Trace.WriteLine("[UpdateCheck] Fehler 404: Keine veröffentlichten Releases gefunden.");
+                        Console.WriteLine("[UpdateCheck] Fehler 404: Keine veröffentlichten Releases gefunden.");
+                        Trace.WriteLine("[UpdateCheck] Versuche alternativen Endpoint (alle Releases)...");
+                        Console.WriteLine("[UpdateCheck] Versuche alternativen Endpoint (alle Releases)...");
 
-                    return release;
+                        // Fallback: Versuche alle Releases zu holen und nimm die neueste
+                        var altUrl = "https://api.github.com/repos/Flecky13/neTiPx-V2/releases?per_page=1";
+                        var altResponse = await client.GetStringAsync(altUrl);
+
+                        var options2 = new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true,
+                            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                        };
+
+                        var releases = JsonSerializer.Deserialize<List<GitHubRelease>>(altResponse, options2);
+
+                        if (releases?.Count > 0)
+                        {
+                            Trace.WriteLine("[UpdateCheck] Alte Release gefunden (Fallback)");
+                            Console.WriteLine("[UpdateCheck] Alte Release gefunden (Fallback)");
+                            return releases[0];
+                        }
+
+                        Trace.WriteLine("[UpdateCheck] Auch Fallback-Endpoint hat keine Releases");
+                        Console.WriteLine("[UpdateCheck] Auch Fallback-Endpoint hat keine Releases");
+                        return null;
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        Trace.WriteLine($"[UpdateCheck] HTTP-Fehler: {ex.Message}");
+                        Console.WriteLine($"[UpdateCheck] HTTP-Fehler: {ex.Message}");
+                        if (ex.StatusCode.HasValue)
+                        {
+                            Trace.WriteLine($"[UpdateCheck] Status Code: {(int)ex.StatusCode}");
+                            Console.WriteLine($"[UpdateCheck] Status Code: {(int)ex.StatusCode}");
+                        }
+                        throw;
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[UpdateCheck] Fehler beim GitHub API Aufruf: {ex.Message}");
+                Console.WriteLine($"[UpdateCheck] Fehler beim GitHub API Aufruf: {ex.Message}");
+                throw;
+            }
+        }
 
         private class GitHubRelease
         {
