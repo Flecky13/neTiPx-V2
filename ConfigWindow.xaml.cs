@@ -1789,15 +1789,15 @@ namespace neTiPx
             catch { }
         }
 
-            private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
-            {
-                Trace.WriteLine("[UpdateCheck] ========== Update-Check gestartet ==========");
-                Console.WriteLine("[UpdateCheck] ========== Update-Check gestartet ==========");
+        private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            Trace.WriteLine("[UpdateCheck] ========== Update-Check gestartet ==========");
+            Console.WriteLine("[UpdateCheck] ========== Update-Check gestartet ==========");
 
-                if (sender is Button btn)
-                {
-                    btn.IsEnabled = false;
-                    btn.Content = "Überprüfe...";
+            if (sender is Button btn)
+            {
+                btn.IsEnabled = false;
+                btn.Content = "Überprüfe...";
 
                 try
                 {
@@ -1826,58 +1826,153 @@ namespace neTiPx
                         Trace.WriteLine($"[UpdateCheck] Neue Version verfügbar: {latestVersion} > {currentVersion}");
                         Console.WriteLine($"[UpdateCheck] Neue Version verfügbar: {latestVersion} > {currentVersion}");
                         var result = MessageBox.Show(
-                                $"Neue Version verfügbar!\n\n" +
-                                $"Installierte Version: {currentVersion}\n" +
-                                $"Verfügbare Version: {latestVersion}\n\n" +
-                                $"Möchten Sie die neue Version jetzt herunterladen?",
-                                "Update verfügbar",
-                                MessageBoxButton.YesNo,
-                                MessageBoxImage.Information);
+                            $"Neue Version verfügbar!\n\n" +
+                            $"Installierte Version: {currentVersion}\n" +
+                            $"Verfügbare Version: {latestVersion}\n\n" +
+                            $"Möchten Sie die neue Version jetzt installieren?",
+                            "Update verfügbar",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Information);
 
-                            if (result == MessageBoxResult.Yes)
-                            {
-                                try
-                                {
-                                    Process.Start(new ProcessStartInfo(latestRelease.HtmlUrl) { UseShellExecute = true });
-                                }
-                                catch (Exception ex)
-                                {
-                                    MessageBox.Show($"Fehler beim Öffnen des Browsers: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
-                                }
-                            }
-                        }
-                        else
+                        if (result == MessageBoxResult.Yes)
                         {
-                            Trace.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
-                            Console.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
-                            MessageBox.Show(
-                                $"Sie verwenden bereits die neueste Version.\n\nVersion: {currentVersion}",
-                                "Auf dem neuesten Stand",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Information);
+                            Trace.WriteLine($"[UpdateCheck] Starte Download für Version {latestVersion}");
+                            Console.WriteLine($"[UpdateCheck] Starte Download für Version {latestVersion}");
+                            await DownloadAndInstallUpdateAsync(latestRelease);
                         }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Trace.WriteLine($"[UpdateCheck] Fehler: {ex.Message}");
-                        Console.WriteLine($"[UpdateCheck] Fehler: {ex.Message}");
-                        Trace.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
-                        Console.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
-                        MessageBox.Show($"Fehler bei der Update-Überprüfung: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
-                    finally
-                    {
-                        btn.Content = "Nach Updates suchen";
-                        btn.IsEnabled = true;
+                        Trace.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
+                        Console.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
+                        MessageBox.Show(
+                            $"Sie verwenden bereits die neueste Version.\n\nVersion: {currentVersion}",
+                            "Auf dem neuesten Stand",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Information);
                     }
                 }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine($"[UpdateCheck] Fehler: {ex.Message}");
+                    Console.WriteLine($"[UpdateCheck] Fehler: {ex.Message}");
+                    Trace.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                    Console.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                    MessageBox.Show($"Fehler bei der Update-Überprüfung: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    btn.Content = "Nach Updates suchen";
+                    btn.IsEnabled = true;
+                }
             }
+        }
 
-            private Version GetCurrentVersion()
+        private async Task DownloadAndInstallUpdateAsync(GitHubRelease release)
+        {
+            try
             {
-                var asm = System.Reflection.Assembly.GetExecutingAssembly();
-                return asm.GetName().Version ?? new Version(0, 0, 0, 0);
+                // Find .exe in assets
+                var exeAsset = release.Assets?.FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+                if (exeAsset == null)
+                {
+                    Trace.WriteLine("[UpdateCheck] Fehler: Keine .exe im Release gefunden");
+                    Console.WriteLine("[UpdateCheck] Fehler: Keine .exe im Release gefunden");
+                    MessageBox.Show("Fehler: Keine ausführdatei im Release gefunden.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                Trace.WriteLine($"[UpdateCheck] Lade herunter: {exeAsset.BrowserDownloadUrl}");
+                Console.WriteLine($"[UpdateCheck] Lade herunter: {exeAsset.BrowserDownloadUrl}");
+
+                // Download to temp file
+                var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), exeAsset.Name);
+
+                using (var client = new HttpClient())
+                {
+                    client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateInstaller");
+                    client.Timeout = TimeSpan.FromSeconds(300); // 5 Minuten
+
+                    var progressIndicator = new Progress<long>(bytesReceived =>
+                    {
+                        Trace.WriteLine($"[UpdateCheck] Download: {bytesReceived / 1024} KB");
+                    });
+
+                    using (var response = await client.GetAsync(exeAsset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
+                    {
+                        response.EnsureSuccessStatusCode();
+                        var totalBytes = response.Content.Headers.ContentLength ?? -1;
+                        Trace.WriteLine($"[UpdateCheck] Download-Größe: {(totalBytes / 1024 / 1024)} MB");
+                        Console.WriteLine($"[UpdateCheck] Download-Größe: {(totalBytes / 1024 / 1024)} MB");
+
+                        using (var contentStream = await response.Content.ReadAsStreamAsync())
+                        using (var fileStream = System.IO.File.Create(tempPath))
+                        {
+                            await contentStream.CopyToAsync(fileStream);
+                        }
+                    }
+                }
+
+                Trace.WriteLine($"[UpdateCheck] Download abgeschlossen: {tempPath}");
+                Console.WriteLine($"[UpdateCheck] Download abgeschlossen: {tempPath}");
+
+                // Create batch file to replace app and start new version
+                var batchPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "neTiPx_UpdateInstaller.bat");
+                var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                var currentExeDir = System.IO.Path.GetDirectoryName(currentExePath);
+                var backupPath = System.IO.Path.Combine(currentExeDir, "neTiPx.exe.backup");
+
+                var batchContent = $@"@echo off
+REM Warte bis alte Instanz beendet wurde
+timeout /t 2 /nobreak
+REM Backup erstellen
+if exist ""{currentExePath}"" (
+    move /y ""{currentExePath}"" ""{backupPath}""
+)
+REM Neue Version kopieren
+copy /y ""{tempPath}"" ""{currentExePath}""
+REM Starten der neuen Instanz
+start """" ""{currentExePath}""
+REM Cleanup
+del /q ""{tempPath}""
+del /q ""%~f0""
+";
+
+                System.IO.File.WriteAllText(batchPath, batchContent);
+                Trace.WriteLine($"[UpdateCheck] Batch-Datei erstellt: {batchPath}");
+                Console.WriteLine($"[UpdateCheck] Batch-Datei erstellt: {batchPath}");
+
+                // Close current app
+                Trace.WriteLine("[UpdateCheck] Schließe aktuelle Instanz...");
+                Console.WriteLine("[UpdateCheck] Schließe aktuelle Instanz...");
+
+                // Start batch file and exit
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = batchPath,
+                    UseShellExecute = true,
+                    CreateNoWindow = true
+                });
+
+                // Exit current application
+                Application.Current.Shutdown();
             }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[UpdateCheck] Fehler bei Update-Installation: {ex.Message}");
+                Console.WriteLine($"[UpdateCheck] Fehler bei Update-Installation: {ex.Message}");
+                Trace.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                Console.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                MessageBox.Show($"Fehler bei der Update-Installation: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private Version GetCurrentVersion()
+        {
+            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+            return asm.GetName().Version ?? new Version(0, 0, 0, 0);
+        }
 
         private Version ParseVersion(string tagName)
         {
@@ -1946,5 +2041,20 @@ namespace neTiPx
 
             [System.Text.Json.Serialization.JsonPropertyName("draft")]
             public bool Draft { get; set; }
+
+            [System.Text.Json.Serialization.JsonPropertyName("assets")]
+            public List<ReleaseAsset> Assets { get; set; } = new List<ReleaseAsset>();
+        }
+
+        private class ReleaseAsset
+        {
+            [System.Text.Json.Serialization.JsonPropertyName("name")]
+            public string Name { get; set; } = string.Empty;
+
+            [System.Text.Json.Serialization.JsonPropertyName("browser_download_url")]
+            public string BrowserDownloadUrl { get; set; } = string.Empty;
+
+            [System.Text.Json.Serialization.JsonPropertyName("size")]
+            public long Size { get; set; }
         }    }
 }
