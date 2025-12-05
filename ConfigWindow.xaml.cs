@@ -1872,90 +1872,149 @@ namespace neTiPx
         {
             try
             {
-                // Find .exe in assets
-                var exeAsset = release.Assets?.FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+                Trace.WriteLine("[UpdateCheck] ========== Download und Installation gestartet ==========");
+                Console.WriteLine("[UpdateCheck] ========== Download und Installation gestartet ==========");
 
-                if (exeAsset == null)
+                // Debug: Zeige alle Assets
+                if (release.Assets != null && release.Assets.Count > 0)
                 {
-                    Trace.WriteLine("[UpdateCheck] Fehler: Keine .exe im Release gefunden");
-                    Console.WriteLine("[UpdateCheck] Fehler: Keine .exe im Release gefunden");
-                    MessageBox.Show("Fehler: Keine ausführdatei im Release gefunden.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+                    Trace.WriteLine($"[UpdateCheck] Gefundene Assets: {release.Assets.Count}");
+                    Console.WriteLine($"[UpdateCheck] Gefundene Assets: {release.Assets.Count}");
+                    foreach (var asset in release.Assets)
+                    {
+                        Trace.WriteLine($"[UpdateCheck]   - {asset.Name} ({asset.Size} bytes)");
+                        Console.WriteLine($"[UpdateCheck]   - {asset.Name} ({asset.Size} bytes)");
+                    }
+                }
+                else
+                {
+                    Trace.WriteLine("[UpdateCheck] Warnung: Keine Assets im Release gefunden!");
+                    Console.WriteLine("[UpdateCheck] Warnung: Keine Assets im Release gefunden!");
+                }
+
+                // Find Setup-Installer (neTiPx_Setup_*.exe)
+                var setupAsset = release.Assets?.FirstOrDefault(a =>
+                    a.Name.Contains("Setup", StringComparison.OrdinalIgnoreCase) &&
+                    a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+
+                if (setupAsset == null)
+                {
+                    Trace.WriteLine("[UpdateCheck] Fehler: Kein Setup-Installer im Release gefunden");
+                    Console.WriteLine("[UpdateCheck] Fehler: Kein Setup-Installer im Release gefunden");
+                    MessageBox.Show("Fehler: Kein Setup-Installer (neTiPx_Setup_*.exe) im Release gefunden.", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                Trace.WriteLine($"[UpdateCheck] Lade herunter: {exeAsset.BrowserDownloadUrl}");
-                Console.WriteLine($"[UpdateCheck] Lade herunter: {exeAsset.BrowserDownloadUrl}");
+                Trace.WriteLine($"[UpdateCheck] Setup-Installer gefunden: {setupAsset.Name}");
+                Console.WriteLine($"[UpdateCheck] Setup-Installer gefunden: {setupAsset.Name}");
+                Trace.WriteLine($"[UpdateCheck] Download-URL: {setupAsset.BrowserDownloadUrl}");
+                Console.WriteLine($"[UpdateCheck] Download-URL: {setupAsset.BrowserDownloadUrl}");
+                Trace.WriteLine($"[UpdateCheck] Dateigröße: {setupAsset.Size / 1024 / 1024} MB");
+                Console.WriteLine($"[UpdateCheck] Dateigröße: {setupAsset.Size / 1024 / 1024} MB");
 
                 // Download to temp file
-                var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), exeAsset.Name);
+                var tempPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), setupAsset.Name);
+                Trace.WriteLine($"[UpdateCheck] Temp-Datei-Pfad: {tempPath}");
+                Console.WriteLine($"[UpdateCheck] Temp-Datei-Pfad: {tempPath}");
 
-                using (var client = new HttpClient())
+                try
                 {
-                    client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateInstaller");
-                    client.Timeout = TimeSpan.FromSeconds(300); // 5 Minuten
-
-                    var progressIndicator = new Progress<long>(bytesReceived =>
+                    using (var client = new HttpClient())
                     {
-                        Trace.WriteLine($"[UpdateCheck] Download: {bytesReceived / 1024} KB");
-                    });
+                        client.DefaultRequestHeaders.Add("User-Agent", "neTiPx-UpdateInstaller");
+                        client.Timeout = TimeSpan.FromSeconds(300); // 5 Minuten
 
-                    using (var response = await client.GetAsync(exeAsset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
-                    {
-                        response.EnsureSuccessStatusCode();
-                        var totalBytes = response.Content.Headers.ContentLength ?? -1;
-                        Trace.WriteLine($"[UpdateCheck] Download-Größe: {(totalBytes / 1024 / 1024)} MB");
-                        Console.WriteLine($"[UpdateCheck] Download-Größe: {(totalBytes / 1024 / 1024)} MB");
+                        Trace.WriteLine("[UpdateCheck] Starte HTTP GET Request...");
+                        Console.WriteLine("[UpdateCheck] Starte HTTP GET Request...");
 
-                        using (var contentStream = await response.Content.ReadAsStreamAsync())
-                        using (var fileStream = System.IO.File.Create(tempPath))
+                        using (var response = await client.GetAsync(setupAsset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
                         {
-                            await contentStream.CopyToAsync(fileStream);
+                            Trace.WriteLine($"[UpdateCheck] HTTP Status: {(int)response.StatusCode} {response.StatusCode}");
+                            Console.WriteLine($"[UpdateCheck] HTTP Status: {(int)response.StatusCode} {response.StatusCode}");
+
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                throw new Exception($"HTTP Error {(int)response.StatusCode}: {response.StatusCode}");
+                            }
+
+                            var totalBytes = response.Content.Headers.ContentLength ?? -1;
+                            Trace.WriteLine($"[UpdateCheck] Download-Größe von Server: {(totalBytes / 1024 / 1024)} MB");
+                            Console.WriteLine($"[UpdateCheck] Download-Größe von Server: {(totalBytes / 1024 / 1024)} MB");
+
+                            Trace.WriteLine("[UpdateCheck] Erstelle Temp-Datei...");
+                            Console.WriteLine("[UpdateCheck] Erstelle Temp-Datei...");
+
+                            using (var contentStream = await response.Content.ReadAsStreamAsync())
+                            using (var fileStream = System.IO.File.Create(tempPath))
+                            {
+                                await contentStream.CopyToAsync(fileStream);
+                            }
+
+                            Trace.WriteLine($"[UpdateCheck] Datei-Download abgeschlossen");
+                            Console.WriteLine($"[UpdateCheck] Datei-Download abgeschlossen");
+
+                            // Verify file was written
+                            if (System.IO.File.Exists(tempPath))
+                            {
+                                var fileInfo = new System.IO.FileInfo(tempPath);
+                                Trace.WriteLine($"[UpdateCheck] Datei vorhanden: {fileInfo.Length} bytes");
+                                Console.WriteLine($"[UpdateCheck] Datei vorhanden: {fileInfo.Length} bytes");
+                            }
+                            else
+                            {
+                                throw new Exception("Temp-Datei wurde nicht erstellt!");
+                            }
                         }
                     }
+                }
+                catch (HttpRequestException ex)
+                {
+                    Trace.WriteLine($"[UpdateCheck] HTTP-Request-Fehler: {ex.Message}");
+                    Console.WriteLine($"[UpdateCheck] HTTP-Request-Fehler: {ex.Message}");
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine($"[UpdateCheck] Fehler beim Download: {ex.Message}");
+                    Console.WriteLine($"[UpdateCheck] Fehler beim Download: {ex.Message}");
+                    Trace.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                    Console.WriteLine($"[UpdateCheck] Stack Trace: {ex.StackTrace}");
+                    throw;
                 }
 
                 Trace.WriteLine($"[UpdateCheck] Download abgeschlossen: {tempPath}");
                 Console.WriteLine($"[UpdateCheck] Download abgeschlossen: {tempPath}");
 
-                // Create batch file to replace app and start new version
-                var batchPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "neTiPx_UpdateInstaller.bat");
-                var currentExePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                var currentExeDir = System.IO.Path.GetDirectoryName(currentExePath) ?? AppDomain.CurrentDomain.BaseDirectory;
-                var backupPath = System.IO.Path.Combine(currentExeDir, "neTiPx.exe.backup");
+                // Verify installer file exists
+                if (!System.IO.File.Exists(tempPath))
+                {
+                    throw new Exception($"Installer-Datei konnte nicht erstellt werden: {tempPath}");
+                }
 
-                var batchContent = $@"@echo off
-REM Warte bis alte Instanz beendet wurde
-timeout /t 2 /nobreak
-REM Backup erstellen
-if exist ""{currentExePath}"" (
-    move /y ""{currentExePath}"" ""{backupPath}""
-)
-REM Neue Version kopieren
-copy /y ""{tempPath}"" ""{currentExePath}""
-REM Starten der neuen Instanz
-start """" ""{currentExePath}""
-REM Cleanup
-del /q ""{tempPath}""
-del /q ""%~f0""
-";
-
-                System.IO.File.WriteAllText(batchPath, batchContent);
-                Trace.WriteLine($"[UpdateCheck] Batch-Datei erstellt: {batchPath}");
-                Console.WriteLine($"[UpdateCheck] Batch-Datei erstellt: {batchPath}");
+                var installerFileInfo = new System.IO.FileInfo(tempPath);
+                Trace.WriteLine($"[UpdateCheck] Installer-Dateigröße: {installerFileInfo.Length} bytes");
+                Console.WriteLine($"[UpdateCheck] Installer-Dateigröße: {installerFileInfo.Length} bytes");
 
                 // Close current app
                 Trace.WriteLine("[UpdateCheck] Schließe aktuelle Instanz...");
                 Console.WriteLine("[UpdateCheck] Schließe aktuelle Instanz...");
 
-                // Start batch file and exit
+                // Start installer
+                Trace.WriteLine($"[UpdateCheck] Starte Installer: {tempPath}");
+                Console.WriteLine($"[UpdateCheck] Starte Installer: {tempPath}");
+
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = batchPath,
+                    FileName = tempPath,
                     UseShellExecute = true,
-                    CreateNoWindow = true
+                    CreateNoWindow = false
                 });
 
-                // Exit current application
+                // Wait a bit then exit current application
+                await Task.Delay(1000);
+
+                Trace.WriteLine("[UpdateCheck] Beende aktuelle Instanz...");
+                Console.WriteLine("[UpdateCheck] Beende aktuelle Instanz...");
                 Application.Current.Shutdown();
             }
             catch (Exception ex)
