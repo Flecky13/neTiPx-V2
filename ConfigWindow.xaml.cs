@@ -85,16 +85,36 @@ namespace neTiPx
                     if (this.FindName("TabControlMain") is TabControl tc)
                     {
                         tc.SelectionChanged += TabControlMain_SelectionChanged;
-                    }
-                        // Also attach selection handler for the dynamic IP tabs control
-                        try
+
+                        // Set initial button visibility based on currently selected tab
+                        if (tc.SelectedItem is TabItem ti)
                         {
-                            if (this.FindName("IpTabsControl") is TabControl itc)
+                            var header = ti.Header?.ToString() ?? string.Empty;
+                            bool isIpSettingsTab = header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                                  header.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                            if (this.FindName("BtnApply") is Button btnApply)
                             {
-                                itc.SelectionChanged += IpTabsControl_SelectionChanged;
+                                btnApply.Visibility = isIpSettingsTab ? Visibility.Visible : Visibility.Collapsed;
+                            }
+
+                            if (this.FindName("BtnSave") is Button btnSave)
+                            {
+                                btnSave.Visibility = header.IndexOf("Info", StringComparison.OrdinalIgnoreCase) >= 0
+                                    ? Visibility.Collapsed
+                                    : Visibility.Visible;
                             }
                         }
-                        catch { }
+                    }
+                    // Also attach selection handler for the dynamic IP tabs control
+                    try
+                    {
+                        if (this.FindName("IpTabsControl") is TabControl itc)
+                        {
+                            itc.SelectionChanged += IpTabsControl_SelectionChanged;
+                        }
+                    }
+                    catch { }
                 }
                 catch { }
             }
@@ -1607,6 +1627,36 @@ namespace neTiPx
             return true;
         }
 
+        private void UpdateButtonVisibility(int selectedTabIndex)
+        {
+            try
+            {
+                if (this.FindName("TabControlMain") is TabControl tc && selectedTabIndex >= 0 && selectedTabIndex < tc.Items.Count)
+                {
+                    if (tc.Items[selectedTabIndex] is TabItem ti)
+                    {
+                        var header = ti.Header?.ToString() ?? string.Empty;
+                        bool isIpSettingsTab = header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                              header.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                        if (this.FindName("BtnApply") is Button btnApply)
+                        {
+                            btnApply.Visibility = isIpSettingsTab ? Visibility.Visible : Visibility.Collapsed;
+                        }
+
+                        // Hide "Speichern" button in Info tab
+                        if (this.FindName("BtnSave") is Button btnSave)
+                        {
+                            btnSave.Visibility = header.IndexOf("Info", StringComparison.OrdinalIgnoreCase) >= 0
+                                ? Visibility.Collapsed
+                                : Visibility.Visible;
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
         public void SelectAdapterTab()
         {
             try
@@ -1617,6 +1667,7 @@ namespace neTiPx
                     try
                     {
                         tc.SelectedIndex = 0;
+                        UpdateButtonVisibility(0);
                         // Ensure adapters are loaded
                         LoadAdapters();
                     }
@@ -1639,6 +1690,7 @@ namespace neTiPx
                     try
                     {
                         tc.SelectedIndex = 1;
+                        UpdateButtonVisibility(1);
                         // Ensure combo is filled/loaded
                         LoadIpSettings();
                     }
@@ -1758,6 +1810,7 @@ namespace neTiPx
                     }
                     finally
                     {
+                        UpdateButtonVisibility(3);
                         ExitSuspendEvents();
                     }
                 }
@@ -1779,6 +1832,7 @@ namespace neTiPx
                             if (tc.Items[i] is TabItem ti && (ti.Header?.ToString() ?? string.Empty).IndexOf("Tools", StringComparison.OrdinalIgnoreCase) >= 0)
                             {
                                 tc.SelectedIndex = i;
+                                UpdateButtonVisibility(i);
                                 break;
                             }
                         }
