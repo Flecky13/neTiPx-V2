@@ -62,7 +62,7 @@ Office.DNS = 8.8.8.8
 ![Alt text](Images/Config.png)
 
 
-IP Settings (Config-Fenster)
+## IP Settings (Config-Fenster)
 ---------------------------
 Bereich `IP Settings`, in dem du mehrere IP-Profile als Tabs anlegen kannst. Jedes Profil enthält:
 
@@ -74,18 +74,18 @@ Bereich `IP Settings`, in dem du mehrere IP-Profile als Tabs anlegen kannst. Jed
 ![Alt text](Images/IP_Settings.png)
 
 
-Anwenden einer Konfiguration
+## Anwenden einer Konfiguration
 ----------------------------
 - Wähle das gewünschte Profil-Tab und klicke `Anwenden`.
 - Die Konfiguration wird zunächst auf die Netzwerkkarte geschrieben.
 
 
-Weitere Hinweise
+## Weitere Hinweise
 ----------------
 - Für das Anwenden von IP-Konfigurationen wird `netsh` verwendet; die App fordert beim Ausführen der Änderung Administratorrechte an.
 - Beim Speichern werden die IP-Profile in `config.ini` (Schlüssel `IpProfileNames` und `<ProfileName>.<Feld>`) persistiert.
 
-Lizenz & Kontakt
+### Lizenz & Kontakt
 ----------------
 Siehe `LICENSE` im Repository. Für Fragen zum Code bitte Issues/PRs im Repo verwenden.
 
