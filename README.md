@@ -43,6 +43,20 @@ Wesentliche Funktionen
 - **Hintergrund-Modus**:
   - Im Hintergrund Ping-Überwachung weiterlaufen
 
+### WiFi-Netzwerke (Tools → WiFi Netzwerke)
+- **Aktiver Netzwerk-Scan** mit Native WiFi API
+- **Alle Netzwerke anzeigen** in sortbarer Tabelle:
+  - Signal-Symbol (📶/📳/📴/❌) und Signalstärke
+  - SSID, BSSID (MAC-Adresse)
+  - Signalstärke in dBm und Prozent
+- **Sortierung** nach jeder Spalte durch Klick auf Spaltenüberschrift
+- **Doppelklick auf Netzwerk** öffnet Detail-Fenster mit:
+  - Netzwerktyp (Infrastructure/Ad-Hoc)
+  - Verschlüsselung, Kanal, Frequenz, PHY-Typ (802.11a/b/g/n/ac/ax)
+  - Link Quality, Beacon-Intervall
+  - Unterstützte Datenraten
+  - Technische Details (Capabilities, Regulatory Domain)
+
 Konfiguration (`config.ini`)
 ---------------------------
 ---------------------------
