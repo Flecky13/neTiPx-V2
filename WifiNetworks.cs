@@ -7,10 +7,25 @@ namespace neTiPx
 {
     public class WifiNetwork
     {
+        // Basic Info
         public string SSID { get; set; }
         public string BSSID { get; set; }
         public int SignalStrengthDbm { get; set; }
         public int SignalStrengthPercent { get; set; }
+
+        // Extended Info
+        public string NetworkType { get; set; }          // Infrastructure / Ad-Hoc
+        public string PhyType { get; set; }              // 802.11a/b/g/n/ac/ax
+        public uint LinkQuality { get; set; }            // 0-100
+        public bool InRegDomain { get; set; }            // Regulatory Domain
+        public ushort BeaconInterval { get; set; }       // ms
+        public uint Channel { get; set; }                // Calculated from frequency
+        public uint Frequency { get; set; }              // MHz
+        public ushort Capabilities { get; set; }         // Capability flags
+        public bool IsSecured { get; set; }              // Privacy bit from capabilities
+        public string[] SupportedRates { get; set; }     // Mbps
+        public DateTime LastSeen { get; set; }           // Timestamp
+        public uint PhyId { get; set; }                  // Physical ID
 
         public string SignalSymbol
         {
@@ -30,6 +45,9 @@ namespace neTiPx
             SignalStrengthDbm = signalDbm;
             // Convert dBm to percentage (typical range: -30 to -90 dBm)
             SignalStrengthPercent = Math.Max(0, Math.Min(100, 2 * (signalDbm + 100)));
+            SupportedRates = Array.Empty<string>();
+            NetworkType = "Unknown";
+            PhyType = "Unknown";
         }
     }
 
@@ -199,13 +217,48 @@ namespace neTiPx
                                             }
 
                                             // Extract BSSID and RSSI from the structure
-                                            string bssidStr = BitConverter.ToString(entry.dot11BssId);
+                                            string bssidStr = BitConverter.ToString(entry.dot11BssId).Replace("-", ":");
                                             int rssi = entry.lRssi;
 
                                             // Only add if RSSI is reasonable (-100 to 0 dBm)
                                             if (rssi >= -100 && rssi <= 0 && entry.uSSIDLength <= 32)
                                             {
-                                                networks.Add(new WifiNetwork(ssid, bssidStr, rssi));
+                                                var network = new WifiNetwork(ssid, bssidStr, rssi)
+                                                {
+                                                    // Network Type
+                                                    NetworkType = GetNetworkType(entry.dot11BssType),
+
+                                                    // PHY Type (802.11a/b/g/n/ac/ax)
+                                                    PhyType = GetPhyType(entry.dot11BssPhyType),
+
+                                                    // Link Quality (0-100)
+                                                    LinkQuality = entry.uLinkQuality,
+
+                                                    // Regulatory Domain
+                                                    InRegDomain = entry.bInRegDomain != 0,
+
+                                                    // Beacon Interval (typically 100ms)
+                                                    BeaconInterval = entry.usBeaconPeriod,
+
+                                                    // Frequency and Channel
+                                                    Frequency = entry.ulChCenterFrequency,
+                                                    Channel = FrequencyToChannel(entry.ulChCenterFrequency),
+
+                                                    // Capability Information
+                                                    Capabilities = entry.usCapabilityInformation,
+                                                    IsSecured = (entry.usCapabilityInformation & 0x0010) != 0, // Privacy bit
+
+                                                    // Supported Rates
+                                                    SupportedRates = GetSupportedRates(entry.wlanRateSet),
+
+                                                    // Timestamp
+                                                    LastSeen = DateTime.Now,
+
+                                                    // Physical ID
+                                                    PhyId = entry.uPhyId
+                                                };
+
+                                                networks.Add(network);
                                                 System.Diagnostics.Trace.WriteLine($"[WiFi] Entry {j}: {ssid}, BSSID={bssidStr}, RSSI={rssi}");
                                             }
 
@@ -249,6 +302,90 @@ namespace neTiPx
                 .Select(g => g.First())
                 .OrderByDescending(n => n.SignalStrengthDbm)
                 .ToList();
+        }
+
+        // Helper methods for interpreting WiFi data
+        private static string GetNetworkType(uint bssType)
+        {
+            return bssType switch
+            {
+                1 => "Infrastructure",
+                2 => "Independent (Ad-Hoc)",
+                3 => "Any",
+                _ => $"Unknown ({bssType})"
+            };
+        }
+
+        private static string GetPhyType(uint phyType)
+        {
+            return phyType switch
+            {
+                1 => "802.11 FHSS",
+                2 => "802.11 DSSS",
+                3 => "802.11 IR",
+                4 => "802.11a",
+                5 => "802.11b",
+                6 => "802.11g",
+                7 => "802.11n",
+                8 => "802.11ac",
+                9 => "802.11ad",
+                10 => "802.11ax (Wi-Fi 6)",
+                11 => "802.11be (Wi-Fi 7)",
+                _ => $"Unknown ({phyType})"
+            };
+        }
+
+        private static uint FrequencyToChannel(uint frequency)
+        {
+            if (frequency == 0) return 0;
+
+            // 2.4 GHz band (channels 1-14)
+            if (frequency >= 2412 && frequency <= 2484)
+            {
+                if (frequency == 2484) return 14;
+                return (frequency - 2412) / 5 + 1;
+            }
+
+            // 5 GHz band (channels 36-165)
+            if (frequency >= 5160 && frequency <= 5885)
+            {
+                return (frequency - 5000) / 5;
+            }
+
+            // 6 GHz band (Wi-Fi 6E, channels 1-233)
+            if (frequency >= 5955 && frequency <= 7115)
+            {
+                return (frequency - 5950) / 5;
+            }
+
+            return 0;
+        }
+
+        private static string[] GetSupportedRates(uint[] wlanRateSet)
+        {
+            if (wlanRateSet == null || wlanRateSet.Length == 0)
+                return Array.Empty<string>();
+
+            var rates = new List<string>();
+
+            // First 16 entries in the rate set contain the actual rates
+            // Format: rate in units of 0.5 Mbps (bit 15 indicates basic rate)
+            for (int i = 0; i < Math.Min(16, wlanRateSet.Length); i++)
+            {
+                uint rate = wlanRateSet[i];
+                if (rate == 0) break; // End of rate set
+
+                // Extract rate value (lower 15 bits)
+                uint rateValue = rate & 0x7FFF;
+                if (rateValue > 0 && rateValue < 1000) // Sanity check
+                {
+                    double mbps = rateValue * 0.5;
+                    bool isBasic = (rate & 0x8000) != 0;
+                    rates.Add(isBasic ? $"{mbps} Mbps*" : $"{mbps} Mbps");
+                }
+            }
+
+            return rates.ToArray();
         }
     }
 }

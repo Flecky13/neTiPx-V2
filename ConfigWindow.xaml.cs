@@ -2310,9 +2310,11 @@ namespace neTiPx
                     return;
                 }
 
+                // Always reset ItemsSource first to clear any existing bindings
+                dataGrid.ItemsSource = null;
+
                 if (networks == null || networks.Count == 0)
                 {
-                    dataGrid.ItemsSource = null;
                     Trace.WriteLine("[WiFi] Keine Netzwerke gefunden");
                     return;
                 }
@@ -2325,6 +2327,26 @@ namespace neTiPx
                 Trace.WriteLine($"[WiFi] Fehler beim Anzeigen: {ex.Message}");
                 Trace.WriteLine($"[WiFi] Stack Trace: {ex.StackTrace}");
                 Console.WriteLine($"[WiFi] Fehler beim Anzeigen: {ex.Message}");
+            }
+        }
+
+        private void WifiDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                if (sender is System.Windows.Controls.DataGrid dataGrid && dataGrid.SelectedItem is WifiNetwork network)
+                {
+                    var detailsWindow = new WifiDetailsWindow(network)
+                    {
+                        Owner = this
+                    };
+                    detailsWindow.ShowDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[WiFi] Fehler beim Öffnen des Detail-Fensters: {ex.Message}");
+                MessageBox.Show($"Fehler beim Anzeigen der Details: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

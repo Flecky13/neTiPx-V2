@@ -170,7 +170,8 @@
                                           SelectionMode="Single"
                                           AlternatingRowBackground="#F0F0F0"
                                           HeadersVisibility="Column"
-                                          GridLinesVisibility="None">
+                                          GridLinesVisibility="None"
+                                          MouseDoubleClick="WifiDataGrid_MouseDoubleClick">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Signal" Binding="{Binding SignalSymbol}" Width="80" CanUserSort="True" SortMemberPath="SignalStrengthPercent"/>
                                         <DataGridTextColumn Header="SSID" Binding="{Binding SSID}" Width="*" CanUserSort="True"/>
