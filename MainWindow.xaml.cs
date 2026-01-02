@@ -19,6 +19,12 @@ namespace neTiPx
             InitializeComponent();
             Debug.WriteLine("[MainWindow] Konstruktor initialisiert");
 
+            // Globalen Dispatcher Exception Handler registrieren
+            Application.Current.Dispatcher.UnhandledException += (s, e) =>
+            {
+                e.Handled = true;
+            };
+
             //timer.Interval = TimeSpan.FromMinutes(1);
             //timer.Tick += Timer_Tick;
 
@@ -215,59 +221,75 @@ namespace neTiPx
 
         private void OpenOrFocusConfigWindow(Action<ConfigWindow>? selectTab = null)
         {
-            // Prüfen ob ConfigWindow bereits geöffnet ist
-            if (_activeConfigWindow != null && _activeConfigWindow.IsLoaded)
+            try
             {
-                try
+                // Prüfen ob ConfigWindow bereits geöffnet ist
+                if (_activeConfigWindow != null && _activeConfigWindow.IsLoaded)
                 {
-                    // Fenster in den Vordergrund bringen
-                    if (_activeConfigWindow.WindowState == WindowState.Minimized)
+                    try
                     {
-                        _activeConfigWindow.WindowState = WindowState.Normal;
+                        // Fenster in den Vordergrund bringen
+                        if (_activeConfigWindow.WindowState == WindowState.Minimized)
+                        {
+                            _activeConfigWindow.WindowState = WindowState.Normal;
+                        }
+
+                        // Topmost kurz setzen um sicherzustellen dass Fenster in den Vordergrund kommt
+                        _activeConfigWindow.Topmost = true;
+                        _activeConfigWindow.Topmost = false;
+
+                        _activeConfigWindow.Activate();
+                        _activeConfigWindow.Focus();
+
+                        // Tab wechseln falls gewünscht
+                        selectTab?.Invoke(_activeConfigWindow);
+
+                        Debug.WriteLine("[MainWindow] ConfigWindow bereits offen - fokussiert und Tab gewechselt");
+                        return;
                     }
-
-                    // Topmost kurz setzen um sicherzustellen dass Fenster in den Vordergrund kommt
-                    _activeConfigWindow.Topmost = true;
-                    _activeConfigWindow.Topmost = false;
-
-                    _activeConfigWindow.Activate();
-                    _activeConfigWindow.Focus();
-
-                    // Tab wechseln falls gewünscht
-                    selectTab?.Invoke(_activeConfigWindow);
-
-                    Debug.WriteLine("[MainWindow] ConfigWindow bereits offen - fokussiert und Tab gewechselt");
-                    return;
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MainWindow] Fehler bei fokussierten Fenster: {ex.Message}\n{ex.StackTrace}");
+                        _activeConfigWindow = null;
+                    }
                 }
-                catch
+
+                // Neues ConfigWindow erstellen
+                this.Hide();
+                var cfg = new ConfigWindow();
+                cfg.Owner = this;
+                _activeConfigWindow = cfg;
+
+                // Cleanup wenn Fenster geschlossen wird
+                cfg.Closed += (s, e) =>
                 {
                     _activeConfigWindow = null;
-                }
-            }
-
-            // Neues ConfigWindow erstellen
-            this.Hide();
-            var cfg = new ConfigWindow();
-            cfg.Owner = this;
-            _activeConfigWindow = cfg;
-
-            // Cleanup wenn Fenster geschlossen wird
-            cfg.Closed += (s, e) =>
-            {
-                _activeConfigWindow = null;
-                Debug.WriteLine("[MainWindow] ConfigWindow geschlossen");
-            };
-
-            // Tab-Auswahl nach Laden
-            if (selectTab != null)
-            {
-                cfg.Loaded += (s, e) =>
-                {
-                    try { selectTab(cfg); } catch { }
+                    Debug.WriteLine("[MainWindow] ConfigWindow geschlossen");
                 };
-            }
 
-            cfg.ShowDialog();
+                // Tab-Auswahl nach Laden
+                if (selectTab != null)
+                {
+                    cfg.Loaded += (s, e) =>
+                    {
+                        try
+                        {
+                            selectTab(cfg);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[MainWindow] Fehler bei selectTab: {ex.Message}");
+                        }
+                    };
+                }
+
+                cfg.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Fehler in OpenOrFocusConfigWindow: {ex.Message}");
+                this.Show();
+            }
         }
 
         // Netzwerk- und IP-Aktualisierung wurde ins ViewModel verschoben

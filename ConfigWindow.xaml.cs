@@ -1822,25 +1822,59 @@ namespace neTiPx
         {
             try
             {
-                if (this.FindName("TabControlMain") is TabControl tc)
+                if (this.FindName("TabControlMain") is not TabControl tc)
                 {
-                    EnterSuspendEvents();
-                    try
+                    Trace.WriteLine("[ConfigWindow] TabControlMain nicht gefunden");
+                    return;
+                }
+
+                EnterSuspendEvents();
+                try
+                {
+                    // Find and select Tools tab
+                    int toolsTabIndex = -1;
+                    for (int i = 0; i < tc.Items.Count; i++)
                     {
-                        for (int i = 0; i < tc.Items.Count; i++)
+                        if (tc.Items[i] is TabItem ti && (ti.Header?.ToString() ?? string.Empty).IndexOf("Tools", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
-                            if (tc.Items[i] is TabItem ti && (ti.Header?.ToString() ?? string.Empty).IndexOf("Tools", StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                tc.SelectedIndex = i;
-                                UpdateButtonVisibility(i);
-                                break;
-                            }
+                            toolsTabIndex = i;
+                            break;
                         }
                     }
-                    finally { ExitSuspendEvents(); }
+
+                    if (toolsTabIndex >= 0)
+                    {
+                        tc.SelectedIndex = toolsTabIndex;
+                        UpdateButtonVisibility(toolsTabIndex);
+
+                        // Ensure Ping tab is selected by default in ToolsTabControl
+                        // Use Dispatcher to ensure controls are fully rendered
+                        this.Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                if (this.FindName("ToolsTabControl") is TabControl toolsTab && toolsTab.Items.Count > 0)
+                                {
+                                    toolsTab.SelectedIndex = 0;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Trace.WriteLine($"[ConfigWindow] Error setting ToolsTab index: {ex.Message}");
+                            }
+                        }));
+                    }
+                }
+                finally
+                {
+                    ExitSuspendEvents();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[ConfigWindow] Error in SelectToolsTab: {ex.Message}");
+                Trace.WriteLine($"[ConfigWindow] Stack Trace: {ex.StackTrace}");
+            }
         }
 
         private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
@@ -2223,5 +2257,75 @@ namespace neTiPx
 
             [System.Text.Json.Serialization.JsonPropertyName("size")]
             public long Size { get; set; }
-        }    }
+        }
+
+        // --- WiFi Networks Tab ---
+        private async void BtnScanWifi_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (sender is Button btn)
+                {
+                    btn.IsEnabled = false;
+                    btn.Content = "Scanne...";
+
+                    try
+                    {
+                        // Run scan on background thread
+                        var networks = await Task.Run(() => WifiScanner.ScanWifiNetworks());
+
+                        // Update UI on main thread
+                        await this.Dispatcher.InvokeAsync(() =>
+                        {
+                            DisplayWifiNetworks(networks);
+                        });
+                    }
+                    finally
+                    {
+                        btn.Content = "Netzwerke scannen";
+                        btn.IsEnabled = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[WiFi] Fehler beim Scannen: {ex.Message}");
+                Console.WriteLine($"[WiFi] Fehler beim Scannen: {ex.Message}");
+
+                if (sender is Button btn2)
+                {
+                    btn2.Content = "Netzwerke scannen";
+                    btn2.IsEnabled = true;
+                }
+            }
+        }
+
+        private void DisplayWifiNetworks(List<WifiNetwork> networks)
+        {
+            try
+            {
+                if (this.FindName("WifiDataGrid") is not System.Windows.Controls.DataGrid dataGrid)
+                {
+                    Trace.WriteLine("[WiFi] WifiDataGrid konnte nicht gefunden werden");
+                    return;
+                }
+
+                if (networks == null || networks.Count == 0)
+                {
+                    dataGrid.ItemsSource = null;
+                    Trace.WriteLine("[WiFi] Keine Netzwerke gefunden");
+                    return;
+                }
+
+                dataGrid.ItemsSource = networks;
+                Trace.WriteLine($"[WiFi] {networks.Count} Netzwerke angezeigt");
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[WiFi] Fehler beim Anzeigen: {ex.Message}");
+                Trace.WriteLine($"[WiFi] Stack Trace: {ex.StackTrace}");
+                Console.WriteLine($"[WiFi] Fehler beim Anzeigen: {ex.Message}");
+            }
+        }
+    }
 }

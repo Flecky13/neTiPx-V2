@@ -150,6 +150,37 @@
                                 </ScrollViewer>
                             </Grid>
                         </TabItem>
+                        <TabItem Header="WiFi Netzwerke">
+                            <Grid Margin="6">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
+                                    <Button x:Name="BtnScanWifi" Width="110" Margin="2" Click="BtnScanWifi_Click">Netzwerke scannen</Button>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(Klick auf Spalten zum Sortieren)</TextBlock>
+                                </StackPanel>
+
+                                <DataGrid x:Name="WifiDataGrid" Grid.Row="1"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserAddRows="False"
+                                          CanUserDeleteRows="False"
+                                          SelectionMode="Single"
+                                          AlternatingRowBackground="#F0F0F0"
+                                          HeadersVisibility="Column"
+                                          GridLinesVisibility="None">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Signal" Binding="{Binding SignalSymbol}" Width="80" CanUserSort="True" SortMemberPath="SignalStrengthPercent"/>
+                                        <DataGridTextColumn Header="SSID" Binding="{Binding SSID}" Width="*" CanUserSort="True"/>
+                                        <DataGridTextColumn Header="BSSID" Binding="{Binding BSSID}" Width="150" CanUserSort="True"/>
+                                        <DataGridTextColumn Header="dBm" Binding="{Binding SignalStrengthDbm}" Width="80" CanUserSort="True"/>
+                                        <DataGridTextColumn Header="Quality %" Binding="{Binding SignalStrengthPercent}" Width="80" CanUserSort="True"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </Grid>
+                        </TabItem>
                     </TabControl>
                 </Grid>
             </TabItem>
