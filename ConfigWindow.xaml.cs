@@ -50,6 +50,14 @@ namespace neTiPx
             public Grid? RowPanel;
         }
 
+        private class IpAddressEntry
+        {
+            public TextBox? TxtIP;
+            public TextBox? TxtSubnet;
+            public Button? BtnRemove;
+            public Grid? RowPanel;
+        }
+
         private class IpTabData
         {
             public int Index;
@@ -58,8 +66,9 @@ namespace neTiPx
             public TextBox? TxtName;
             public RadioButton? RbDhcp;
             public RadioButton? RbManual;
-            public TextBox? TxtIP;
-            public TextBox? TxtSubnet;
+            public List<IpAddressEntry> IpEntries = new List<IpAddressEntry>();
+            public StackPanel? IpEntriesPanel;
+            public Button? BtnAddIp;
             public TextBox? TxtGateway;
             public TextBox? TxtDNS;
             public System.Windows.Threading.DispatcherTimer? PingTimer;
@@ -172,20 +181,53 @@ namespace neTiPx
                     }
                     else
                     {
-                        var ip = data.TxtIP?.Text.Trim() ?? string.Empty;
-                        var mask = data.TxtSubnet?.Text.Trim() ?? string.Empty;
+                        // Get IP entries
+                        var ipEntries = data.IpEntries?.Where(e => !string.IsNullOrWhiteSpace(e.TxtIP?.Text)).ToList() ?? new List<IpAddressEntry>();
+
+                        if (ipEntries.Count == 0)
+                        {
+                            MessageBox.Show("Mindestens eine IP-Adresse ist erforderlich.");
+                            return;
+                        }
+
                         var gw = data.TxtGateway?.Text.Trim() ?? string.Empty;
                         var dns = data.TxtDNS?.Text.Trim() ?? string.Empty;
 
-                        if (!IsValidIPv4(ip) || !IsValidIPv4(mask))
+                        // Set first IP
+                        var firstIp = ipEntries[0];
+                        var ip = firstIp.TxtIP?.Text.Trim() ?? string.Empty;
+                        var mask = firstIp.TxtSubnet?.Text.Trim() ?? string.Empty;
+
+                        // Validate IP, Gateway and Subnet
+                        var (isValid, errorMsg) = ValidateIpGatewaySubnet(ip, mask, gw);
+                        if (!isValid)
                         {
-                            MessageBox.Show("IP oder Subnetz ungültig. Bitte prüfen.");
+                            MessageBox.Show($"Validierungsfehler:\n\n{errorMsg}");
                             return;
                         }
 
                         string addrCmd = $"netsh interface ipv4 set address name=\"{ni.Name}\" source=static addr={ip} mask={mask}";
                         if (IsValidIPv4(gw)) addrCmd += $" gateway={gw} gwmetric=1";
                         commands.Add(addrCmd);
+
+                        // Add additional IPs
+                        for (int i = 1; i < ipEntries.Count; i++)
+                        {
+                            var additionalIp = ipEntries[i].TxtIP?.Text.Trim() ?? string.Empty;
+                            var additionalMask = ipEntries[i].TxtSubnet?.Text.Trim() ?? string.Empty;
+
+                            if (!string.IsNullOrEmpty(additionalIp))
+                            {
+                                // Validate additional IP
+                                var (additionalValid, additionalError) = ValidateIpGatewaySubnet(additionalIp, additionalMask, string.Empty);
+                                if (!additionalValid)
+                                {
+                                    MessageBox.Show($"Validierungsfehler in IP #{i + 1}:\n\n{additionalError}");
+                                    return;
+                                }
+                                commands.Add($"netsh interface ipv4 add address name=\"{ni.Name}\" addr={additionalIp} mask={additionalMask}");
+                            }
+                        }
 
                         if (IsValidIPv4(dns))
                         {
@@ -647,8 +689,10 @@ namespace neTiPx
             var data = new IpTabData();
             data.Index = index;
 
-            // Container
+            // Main container with scrolling
+            var scrollViewer = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             var panel = new StackPanel { Margin = new Thickness(6) };
+            scrollViewer.Content = panel;
 
             // Name (editable) - used as profile/section name in INI
             // Top row: name on left, GW status on right
@@ -686,37 +730,66 @@ namespace neTiPx
             spMode.Children.Add(rbManual);
             panel.Children.Add(spMode);
 
-            // Fields grid
-            var border = new Border { BorderBrush = System.Windows.Media.Brushes.LightGray, BorderThickness = new Thickness(1), Padding = new Thickness(8), CornerRadius = new CornerRadius(4) };
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            for (int r = 0; r < 4; r++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            // Gateway & DNS (top section)
+            var borderGwDns = new Border { BorderBrush = System.Windows.Media.Brushes.LightGray, BorderThickness = new Thickness(1), Padding = new Thickness(8), CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 0, 8) };
+            var gridGwDns = new Grid();
+            gridGwDns.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            gridGwDns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            gridGwDns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            gridGwDns.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            // Row 0
-            var lblIp = new TextBlock { Text = "IP:", Margin = new Thickness(0, 4, 0, 4), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetRow(lblIp, 0); Grid.SetColumn(lblIp, 0); grid.Children.Add(lblIp);
-            var txtIP = new TextBox { Margin = new Thickness(6) }; Grid.SetRow(txtIP, 0); Grid.SetColumn(txtIP, 1); grid.Children.Add(txtIP);
-
-            // Row 1
-            var lblSubnet = new TextBlock { Text = "Subnetz:", Margin = new Thickness(0, 4, 0, 4), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetRow(lblSubnet, 1); Grid.SetColumn(lblSubnet, 0); grid.Children.Add(lblSubnet);
-            var txtSubnet = new TextBox { Margin = new Thickness(6) }; Grid.SetRow(txtSubnet, 1); Grid.SetColumn(txtSubnet, 1); grid.Children.Add(txtSubnet);
-
-            // Row 2
+            // Row 0: Gateway
             var lblGw = new TextBlock { Text = "Gateway:", Margin = new Thickness(0, 4, 0, 4), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetRow(lblGw, 2); Grid.SetColumn(lblGw, 0); grid.Children.Add(lblGw);
-            var txtGw = new TextBox { Margin = new Thickness(6) }; Grid.SetRow(txtGw, 2); Grid.SetColumn(txtGw, 1); grid.Children.Add(txtGw);
+            Grid.SetRow(lblGw, 0); Grid.SetColumn(lblGw, 0); gridGwDns.Children.Add(lblGw);
+            var txtGw = new TextBox { Margin = new Thickness(6) };
+            Grid.SetRow(txtGw, 0); Grid.SetColumn(txtGw, 1); gridGwDns.Children.Add(txtGw);
 
-            // Row 3
+            // Row 1: DNS
             var lblDns = new TextBlock { Text = "DNS:", Margin = new Thickness(0, 4, 0, 4), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetRow(lblDns, 3); Grid.SetColumn(lblDns, 0); grid.Children.Add(lblDns);
-            var txtDns = new TextBox { Margin = new Thickness(6) }; Grid.SetRow(txtDns, 3); Grid.SetColumn(txtDns, 1); grid.Children.Add(txtDns);
+            Grid.SetRow(lblDns, 1); Grid.SetColumn(lblDns, 0); gridGwDns.Children.Add(lblDns);
+            var txtDns = new TextBox { Margin = new Thickness(6) };
+            Grid.SetRow(txtDns, 1); Grid.SetColumn(txtDns, 1); gridGwDns.Children.Add(txtDns);
 
-            border.Child = grid;
-            panel.Children.Add(border);
+            borderGwDns.Child = gridGwDns;
+            panel.Children.Add(borderGwDns);
 
-            var tab = new TabItem { Header = $"IP #{index}", Content = panel };
+            // IP Addresses section
+            var spIpSection = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+
+            var spIpHeader = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            spIpHeader.Children.Add(new TextBlock { Text = "IP-Adressen & Subnetze:", FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center });
+            var btnAddIp = new Button { Content = "➕ Hinzufügen", Width = 120, Margin = new Thickness(8, 0, 0, 0) };
+            spIpHeader.Children.Add(btnAddIp);
+            spIpSection.Children.Add(spIpHeader);
+
+            // IP Entries container with header
+            var borderIpEntries = new Border { BorderBrush = System.Windows.Media.Brushes.LightGray, BorderThickness = new Thickness(1), Padding = new Thickness(8), CornerRadius = new CornerRadius(4) };
+            var gridIpHeader = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            gridIpHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            gridIpHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            gridIpHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            gridIpHeader.Children.Add(new TextBlock { Text = "IP-Adresse", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 0) });
+            Grid.SetColumn(gridIpHeader.Children[gridIpHeader.Children.Count - 1], 0);
+
+            gridIpHeader.Children.Add(new TextBlock { Text = "Subnetz", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 8, 0) });
+            Grid.SetColumn(gridIpHeader.Children[gridIpHeader.Children.Count - 1], 1);
+
+            gridIpHeader.Children.Add(new TextBlock { Text = "Aktion", FontWeight = FontWeights.Bold });
+            Grid.SetColumn(gridIpHeader.Children[gridIpHeader.Children.Count - 1], 2);
+
+            var ipEntriesPanel = new StackPanel();
+            data.IpEntriesPanel = ipEntriesPanel;
+
+            var spIpEntriesContainer = new StackPanel();
+            spIpEntriesContainer.Children.Add(gridIpHeader);
+            spIpEntriesContainer.Children.Add(ipEntriesPanel);
+
+            borderIpEntries.Child = spIpEntriesContainer;
+            spIpSection.Children.Add(borderIpEntries);
+            panel.Children.Add(spIpSection);
+
+            var tab = new TabItem { Header = $"IP #{index}", Content = scrollViewer };
 
             // Populate adapters from global INI Adapter1/Adapter2
             if (iniValues.TryGetValue("Adapter1", out var a1) && !string.IsNullOrEmpty(a1)) cbAdapter.Items.Add(new ComboBoxItem { Content = a1, Tag = a1 });
@@ -725,15 +798,15 @@ namespace neTiPx
 
             // Wire events
             cbAdapter.SelectionChanged += (s, e) => { if (!EventsSuspended && rbManual.IsChecked == true) LoadSystemValuesIntoTab(data); };
-            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) SetIpFieldsEnabledForTab(data, false); };
-            rbManual.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, true); LoadSystemValuesIntoTab(data); } };
+            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, false); btnAddIp.IsEnabled = false; } };
+            rbManual.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, true); btnAddIp.IsEnabled = true; LoadSystemValuesIntoTab(data); } };
+            btnAddIp.Click += (s, e) => { AddIpEntryToTab(data); };
 
             data.Tab = tab;
             data.AdapterCombo = cbAdapter;
             data.RbDhcp = rbDhcp;
             data.RbManual = rbManual;
-            data.TxtIP = txtIP;
-            data.TxtSubnet = txtSubnet;
+            data.BtnAddIp = btnAddIp;
             data.TxtGateway = txtGw;
             data.TxtDNS = txtDns;
             data.TxtName = txtName;
@@ -763,10 +836,18 @@ namespace neTiPx
                 {
                     rbDhcp.IsChecked = true; SetIpFieldsEnabledForTab(data, false); loaded = true;
                 }
-                if (iniValues.TryGetValue(profileKey + ".IP", out var pip)) txtIP.Text = pip;
-                if (iniValues.TryGetValue(profileKey + ".Subnet", out var psn)) txtSubnet.Text = psn;
                 if (iniValues.TryGetValue(profileKey + ".GW", out var pgw)) txtGw.Text = pgw;
                 if (iniValues.TryGetValue(profileKey + ".DNS", out var pdns)) txtDns.Text = pdns;
+
+                // Load multiple IP/Subnet entries
+                int ipCount = 1;
+                while (iniValues.TryGetValue($"{profileKey}.IP_{ipCount}", out var pip) && !string.IsNullOrEmpty(pip))
+                {
+                    iniValues.TryGetValue($"{profileKey}.Subnet_{ipCount}", out var psn);
+                    AddIpEntryToTab(data, pip, psn ?? string.Empty);
+                    ipCount++;
+                }
+                if (ipCount == 1) AddIpEntryToTab(data); // At least one empty entry
             }
 
             if (!loaded)
@@ -788,10 +869,20 @@ namespace neTiPx
                 }
                 else { rbDhcp.IsChecked = true; SetIpFieldsEnabledForTab(data, false); }
 
-                if (iniValues.TryGetValue(prefix + "IP", out var ip)) txtIP.Text = ip;
-                if (iniValues.TryGetValue(prefix + "Subnet", out var sn)) txtSubnet.Text = sn;
                 if (iniValues.TryGetValue(prefix + "GW", out var gw)) txtGw.Text = gw;
                 if (iniValues.TryGetValue(prefix + "DNS", out var dns)) txtDns.Text = dns;
+
+                // Legacy: single IP/Subnet
+                if (iniValues.TryGetValue(prefix + "IP", out var ip) || iniValues.TryGetValue(prefix + "Subnet", out var sn))
+                {
+                    AddIpEntryToTab(data,
+                        iniValues.TryGetValue(prefix + "IP", out var legacyIp) ? legacyIp : "",
+                        iniValues.TryGetValue(prefix + "Subnet", out var legacySn) ? legacySn : "");
+                }
+                else
+                {
+                    AddIpEntryToTab(data); // At least one empty entry
+                }
             }
 
             // Name handling: set after load so profileKey is updated correctly
@@ -824,10 +915,18 @@ namespace neTiPx
         private void SetIpFieldsEnabledForTab(IpTabData data, bool enabled)
         {
             if (data == null) return;
-            if (data.TxtIP != null) data.TxtIP.IsEnabled = enabled;
-            if (data.TxtSubnet != null) data.TxtSubnet.IsEnabled = enabled;
             if (data.TxtGateway != null) data.TxtGateway.IsEnabled = enabled;
             if (data.TxtDNS != null) data.TxtDNS.IsEnabled = enabled;
+            if (data.BtnAddIp != null) data.BtnAddIp.IsEnabled = enabled;
+            if (data.IpEntries != null)
+            {
+                foreach (var entry in data.IpEntries)
+                {
+                    if (entry.TxtIP != null) entry.TxtIP.IsEnabled = enabled;
+                    if (entry.TxtSubnet != null) entry.TxtSubnet.IsEnabled = enabled;
+                    if (entry.BtnRemove != null) entry.BtnRemove.IsEnabled = enabled;
+                }
+            }
         }
 
         private void LoadSystemValuesIntoTab(IpTabData data)
@@ -838,11 +937,68 @@ namespace neTiPx
             var sys = GetSystemIpv4Settings(sel);
             if (sys != null)
             {
-                if (data.TxtIP != null) data.TxtIP.Text = sys.Value.ip ?? string.Empty;
-                if (data.TxtSubnet != null) data.TxtSubnet.Text = sys.Value.subnet ?? string.Empty;
                 if (data.TxtGateway != null) data.TxtGateway.Text = sys.Value.gateway ?? string.Empty;
                 if (data.TxtDNS != null) data.TxtDNS.Text = sys.Value.dns ?? string.Empty;
+
+                // Clear existing IP entries and load first IP from system
+                if (data.IpEntries != null && data.IpEntriesPanel != null)
+                {
+                    data.IpEntries.Clear();
+                    data.IpEntriesPanel.Children.Clear();
+                    AddIpEntryToTab(data, sys.Value.ip ?? string.Empty, sys.Value.subnet ?? string.Empty);
+                }
             }
+        }
+
+        private void AddIpEntryToTab(IpTabData data, string ipAddress = "", string subnet = "")
+        {
+            if (data == null || data.IpEntriesPanel == null) return;
+
+            var entry = new IpAddressEntry();
+
+            // Create row grid
+            var rowGrid = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // IP Address TextBox
+            var txtIP = new TextBox { Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(4, 4, 4, 4) };
+            txtIP.Text = ipAddress;
+            Grid.SetColumn(txtIP, 0);
+            rowGrid.Children.Add(txtIP);
+
+            // Subnet TextBox
+            var txtSubnet = new TextBox { Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(4, 4, 4, 4) };
+            txtSubnet.Text = subnet;
+            Grid.SetColumn(txtSubnet, 1);
+            rowGrid.Children.Add(txtSubnet);
+
+            // Remove Button
+            var btnRemove = new Button { Content = "✕", Width = 32, Height = 28 };
+            Grid.SetColumn(btnRemove, 2);
+            rowGrid.Children.Add(btnRemove);
+
+            // Remove button click handler
+            btnRemove.Click += (s, e) =>
+            {
+                data.IpEntriesPanel.Children.Remove(rowGrid);
+                data.IpEntries.Remove(entry);
+            };
+
+            // Add to panel
+            data.IpEntriesPanel.Children.Add(rowGrid);
+            entry.TxtIP = txtIP;
+            entry.TxtSubnet = txtSubnet;
+            entry.BtnRemove = btnRemove;
+            entry.RowPanel = rowGrid;
+
+            data.IpEntries.Add(entry);
+
+            // Apply current enabled state
+            txtIP.IsEnabled = data.RbManual?.IsChecked ?? false;
+            txtSubnet.IsEnabled = data.RbManual?.IsChecked ?? false;
+            btnRemove.IsEnabled = data.RbManual?.IsChecked ?? false;
         }
 
         private void IpAdapterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1030,6 +1186,11 @@ namespace neTiPx
                             break;
                         }
                     }
+                    // Also remove old IP_X and Subnet_X entries
+                    if (k.Contains(".IP_") || k.Contains(".Subnet_"))
+                    {
+                        values.Remove(k);
+                    }
                 }
 
                 // Validate profile names are unique and persist settings using the profile name as key
@@ -1049,11 +1210,68 @@ namespace neTiPx
 
                     var adapter = (t.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
                     values[$"{name}.Adapter"] = adapter;
-                    values[$"{name}.Mode"] = (t.RbDhcp != null && t.RbDhcp.IsChecked == true) ? "DHCP" : "Manual";
-                    values[$"{name}.IP"] = t.TxtIP?.Text.Trim() ?? string.Empty;
-                    values[$"{name}.Subnet"] = t.TxtSubnet?.Text.Trim() ?? string.Empty;
+                    var isManual = (t.RbManual != null && t.RbManual.IsChecked == true);
+                    values[$"{name}.Mode"] = isManual ? "Manual" : "DHCP";
                     values[$"{name}.GW"] = t.TxtGateway?.Text.Trim() ?? string.Empty;
                     values[$"{name}.DNS"] = t.TxtDNS?.Text.Trim() ?? string.Empty;
+
+                    // Save multiple IP/Subnet entries
+                    int ipIndex = 1;
+                    if (t.IpEntries != null && isManual)
+                    {
+                        // Validate IP/Gateway/Subnet combination for manual mode
+                        string firstIp = string.Empty;
+                        string firstSubnet = string.Empty;
+                        bool hasValidEntries = false;
+
+                        foreach (var entry in t.IpEntries)
+                        {
+                            var ip = entry.TxtIP?.Text.Trim() ?? string.Empty;
+                            var subnet = entry.TxtSubnet?.Text.Trim() ?? string.Empty;
+                            if (!string.IsNullOrEmpty(ip))
+                            {
+                                if (ipIndex == 1)
+                                {
+                                    firstIp = ip;
+                                    firstSubnet = subnet;
+
+                                    // Validate first IP with gateway and subnet
+                                    var gw = values[$"{name}.GW"] ?? string.Empty;
+                                    var (isValid, errorMsg) = ValidateIpGatewaySubnet(ip, subnet, gw);
+                                    if (!isValid)
+                                    {
+                                        MessageBox.Show($"Validierungsfehler in Profil '{name}':\n\n{errorMsg}");
+                                        return; // abort save
+                                    }
+                                }
+                                else
+                                {
+                                    // Validate additional IPs
+                                    var (isValid, errorMsg) = ValidateIpGatewaySubnet(ip, subnet, string.Empty);
+                                    if (!isValid)
+                                    {
+                                        MessageBox.Show($"Validierungsfehler in Profil '{name}', IP #{ipIndex}:\n\n{errorMsg}");
+                                        return; // abort save
+                                    }
+                                }
+
+                                values[$"{name}.IP_{ipIndex}"] = ip;
+                                values[$"{name}.Subnet_{ipIndex}"] = subnet;
+                                hasValidEntries = true;
+                                ipIndex++;
+                            }
+                        }
+
+                        if (!hasValidEntries && isManual)
+                        {
+                            MessageBox.Show($"Profil '{name}' ist im Manuell-Modus, hat aber keine gültigen IP-Adressen.");
+                            return; // abort save
+                        }
+                    }
+
+                    // Remove old single IP/Subnet keys if they exist
+                    values.Remove($"{name}.IP");
+                    values.Remove($"{name}.Subnet");
                 }
 
                 // Save the ordered list of profile names
@@ -1596,6 +1814,78 @@ namespace neTiPx
                 return addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
             }
             return false;
+        }
+
+        private (bool valid, string errorMessage) ValidateIpGatewaySubnet(string ip, string subnet, string gateway)
+        {
+            // Validate IP
+            if (string.IsNullOrWhiteSpace(ip))
+            {
+                return (false, "IP-Adresse ist erforderlich.");
+            }
+            if (!IsValidIPv4(ip))
+            {
+                return (false, $"IP-Adresse '{ip}' ist ungültig.");
+            }
+
+            // Validate Subnet
+            if (string.IsNullOrWhiteSpace(subnet))
+            {
+                return (false, "Subnetmaske ist erforderlich.");
+            }
+            if (!IsValidIPv4(subnet))
+            {
+                return (false, $"Subnetmaske '{subnet}' ist ungültig.");
+            }
+
+            // Only validate gateway if it's not empty
+            if (!string.IsNullOrWhiteSpace(gateway))
+            {
+                if (!IsValidIPv4(gateway))
+                {
+                    return (false, $"Gateway '{gateway}' ist ungültig.");
+                }
+
+                // Check if gateway is in the same subnet as the IP
+                if (!IsIPInSubnet(ip, gateway, subnet))
+                {
+                    return (false, $"Gateway '{gateway}' passt nicht zum Subnetz der IP '{ip}' mit Maske '{subnet}'.\n\nDas Gateway muss im gleichen Subnetz wie die IP-Adresse liegen.");
+                }
+            }
+
+            return (true, "");
+        }
+
+        private bool IsIPInSubnet(string ip, string testIp, string subnet)
+        {
+            try
+            {
+                if (!System.Net.IPAddress.TryParse(ip, out var ipAddr) ||
+                    !System.Net.IPAddress.TryParse(testIp, out var testAddr) ||
+                    !System.Net.IPAddress.TryParse(subnet, out var subnetAddr))
+                {
+                    return false;
+                }
+
+                // Convert to uint for bitwise operations
+                var ipBytes = ipAddr.GetAddressBytes();
+                var testBytes = testAddr.GetAddressBytes();
+                var subnetBytes = subnetAddr.GetAddressBytes();
+
+                uint ipUint = ((uint)ipBytes[0] << 24) | ((uint)ipBytes[1] << 16) | ((uint)ipBytes[2] << 8) | ipBytes[3];
+                uint testUint = ((uint)testBytes[0] << 24) | ((uint)testBytes[1] << 16) | ((uint)testBytes[2] << 8) | testBytes[3];
+                uint subnetUint = ((uint)subnetBytes[0] << 24) | ((uint)subnetBytes[1] << 16) | ((uint)subnetBytes[2] << 8) | subnetBytes[3];
+
+                // Calculate network address by applying subnet mask
+                uint ipNetwork = ipUint & subnetUint;
+                uint testNetwork = testUint & subnetUint;
+
+                return ipNetwork == testNetwork;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private bool IsValidHostOrIP(string input)
