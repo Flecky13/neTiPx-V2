@@ -839,8 +839,8 @@ namespace neTiPx
             if (cbAdapter.Items.Count > 0) cbAdapter.SelectedIndex = 0;
 
             // Wire events
-            cbAdapter.SelectionChanged += (s, e) => { if (!EventsSuspended && rbManual.IsChecked == true) LoadSystemValuesIntoTab(data); };
-            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, false); btnAddIp.IsEnabled = false; } };
+            cbAdapter.SelectionChanged += (s, e) => { if (!EventsSuspended) { if (rbManual.IsChecked == true) { LoadSystemValuesIntoTab(data); } else if (rbDhcp.IsChecked == true) { LoadSystemValuesIntoTab(data); } } };
+            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, false); btnAddIp.IsEnabled = false; LoadSystemValuesIntoTab(data); } };
             rbManual.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, true); btnAddIp.IsEnabled = true; LoadSystemValuesIntoTab(data); } };
             btnAddIp.Click += (s, e) => { AddIpEntryToTab(data); };
 
@@ -870,13 +870,14 @@ namespace neTiPx
                     }
                     loaded = true;
                 }
+                bool isDhcpMode = false;
                 if (iniValues.TryGetValue(profileKey + ".Mode", out var pm) && pm.Equals("Manual", StringComparison.OrdinalIgnoreCase))
                 {
                     rbManual.IsChecked = true; SetIpFieldsEnabledForTab(data, true); loaded = true;
                 }
                 else if (iniValues.TryGetValue(profileKey + ".Mode", out var _))
                 {
-                    rbDhcp.IsChecked = true; SetIpFieldsEnabledForTab(data, false); loaded = true;
+                    rbDhcp.IsChecked = true; SetIpFieldsEnabledForTab(data, false); loaded = true; isDhcpMode = true;
                 }
                 if (iniValues.TryGetValue(profileKey + ".GW", out var pgw)) txtGw.Text = pgw;
                 if (iniValues.TryGetValue(profileKey + ".DNS", out var pdns)) txtDns.Text = pdns;
@@ -889,7 +890,31 @@ namespace neTiPx
                     AddIpEntryToTab(data, pip, psn ?? string.Empty);
                     ipCount++;
                 }
-                if (ipCount == 1) AddIpEntryToTab(data); // At least one empty entry
+
+                // If DHCP mode and no saved IP entries, load current system values
+                if (isDhcpMode && ipCount == 1)
+                {
+                    if (iniValues.TryGetValue(profileKey + ".Adapter", out var adapterName) && !string.IsNullOrEmpty(adapterName))
+                    {
+                        var sys = GetSystemIpv4Settings(adapterName);
+                        if (sys != null)
+                        {
+                            AddIpEntryToTab(data, sys.Value.ip ?? string.Empty, sys.Value.subnet ?? string.Empty);
+                        }
+                        else
+                        {
+                            AddIpEntryToTab(data); // At least one empty entry
+                        }
+                    }
+                    else
+                    {
+                        AddIpEntryToTab(data); // At least one empty entry
+                    }
+                }
+                else if (ipCount == 1)
+                {
+                    AddIpEntryToTab(data); // At least one empty entry
+                }
             }
 
             if (!loaded)
@@ -905,11 +930,13 @@ namespace neTiPx
                         }
                     }
                 }
+
+                bool isLegacyDhcp = false;
                 if (iniValues.TryGetValue(prefix + "Mode", out var im) && im.Equals("Manual", StringComparison.OrdinalIgnoreCase))
                 {
                     rbManual.IsChecked = true; SetIpFieldsEnabledForTab(data, true);
                 }
-                else { rbDhcp.IsChecked = true; SetIpFieldsEnabledForTab(data, false); }
+                else { rbDhcp.IsChecked = true; SetIpFieldsEnabledForTab(data, false); isLegacyDhcp = true; }
 
                 if (iniValues.TryGetValue(prefix + "GW", out var gw)) txtGw.Text = gw;
                 if (iniValues.TryGetValue(prefix + "DNS", out var dns)) txtDns.Text = dns;
@@ -920,6 +947,26 @@ namespace neTiPx
                     AddIpEntryToTab(data,
                         iniValues.TryGetValue(prefix + "IP", out var legacyIp) ? legacyIp : "",
                         iniValues.TryGetValue(prefix + "Subnet", out var legacySn) ? legacySn : "");
+                }
+                else if (isLegacyDhcp)
+                {
+                    // DHCP mode with no saved values: load current system values
+                    if (iniValues.TryGetValue(prefix + "Adapter", out var adapterName) && !string.IsNullOrEmpty(adapterName))
+                    {
+                        var sys = GetSystemIpv4Settings(adapterName);
+                        if (sys != null)
+                        {
+                            AddIpEntryToTab(data, sys.Value.ip ?? string.Empty, sys.Value.subnet ?? string.Empty);
+                        }
+                        else
+                        {
+                            AddIpEntryToTab(data); // At least one empty entry
+                        }
+                    }
+                    else
+                    {
+                        AddIpEntryToTab(data); // At least one empty entry
+                    }
                 }
                 else
                 {
@@ -1163,6 +1210,16 @@ namespace neTiPx
                 IpTabsControl.SelectedItem = data.Tab;
             }
             finally { ExitSuspendEvents(); }
+
+            // Load system values for the newly created tab
+            if (IpTabsControl.SelectedItem is TabItem ti)
+            {
+                var data = _ipTabs.FirstOrDefault(t => t.Tab == ti);
+                if (data != null)
+                {
+                    LoadSystemValuesIntoTab(data);
+                }
+            }
         }
 
         private void BtnRemoveIpTab_Click(object sender, RoutedEventArgs e)
