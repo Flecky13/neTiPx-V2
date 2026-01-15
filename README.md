@@ -43,7 +43,7 @@ Wesentliche Funktionen
   - Fügt zusätzliche IPs automatisch hinzu
 
 ### Ping-Monitor (Tools → Ping)
-- **Bis zu 6 gleichzeitige Ping-Überwachungen**
+- **Bis zu 10 gleichzeitige Ping-Überwachungen**
 - Unterstützt **IPv4-Adressen UND DNS-Hostnamen** (z.B. google.com)
 - Pro Eintrag:
   - Aktivierung per Checkbox

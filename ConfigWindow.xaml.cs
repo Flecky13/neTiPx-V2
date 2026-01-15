@@ -28,7 +28,7 @@ namespace neTiPx
         private readonly List<IpTabData> _ipTabs = new List<IpTabData>();
 
         // Ping tools
-        private const int MaxPingEntries = 6;
+        private const int MaxPingEntries = 10;
         private const int PingTimeoutMs = 2000;
         private readonly List<PingEntryData> _pingEntries = new List<PingEntryData>();
         private bool _keepPingTimersRunning = false;
@@ -469,93 +469,7 @@ namespace neTiPx
                     else if (header.IndexOf("Info", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         // Populate Info tab content when selected
-                        try
-                        {
-                            var asm = System.Reflection.Assembly.GetExecutingAssembly();
-                            var ver = asm.GetName().Version?.ToString() ?? "?";
-                            if (this.FindName("InfoText") is TextBlock tb)
-                            {
-                                tb.Inlines.Clear();
-                                tb.FontFamily = new System.Windows.Media.FontFamily("Consolas");
-                                tb.FontSize = 12;
-
-                                tb.Inlines.Add(new Run("neTiPx - Netzwerk Infos - by Pedro Tepe"));
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new LineBreak());
-
-                                if (this.FindName("InfoVersionText") is TextBlock vt)
-                                {
-                                    vt.Text = "Version: " + ver;
-                                }
-
-                                tb.Inlines.Add(new Run("Lizenz:"));
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new Run("Dieses Programm steht unter der im Repository angegebenen Lizenz."));
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new LineBreak());
-
-                                tb.Inlines.Add(new Run("Autor:"));
-                                tb.Inlines.Add(new LineBreak());
-                                var email = "github@hometepe.de";
-                                var mailText = "Flecky13 - " + email;
-                                var mailLink = new Hyperlink(new Run(mailText)) { NavigateUri = new Uri("mailto:" + email) };
-                                mailLink.Click += (s2, e2) =>
-                                {
-                                    try { Process.Start(new ProcessStartInfo(mailLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
-                                };
-                                tb.Inlines.Add(mailLink);
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new LineBreak());
-
-                                tb.Inlines.Add(new Run("Repository:"));
-                                tb.Inlines.Add(new LineBreak());
-                                var repoUrl = "https://github.com/Flecky13/neTiPx-V2";
-                                var repoLink = new Hyperlink(new Run(repoUrl)) { NavigateUri = new Uri(repoUrl) };
-                                repoLink.Click += (s3, e3) =>
-                                {
-                                    try { Process.Start(new ProcessStartInfo(repoLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
-                                };
-                                tb.Inlines.Add(repoLink);
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new LineBreak());
-
-                                // Support link (BuyMeACoffee)
-                                tb.Inlines.Add(new Run("Support:"));
-                                tb.Inlines.Add(new LineBreak());
-                                var supportUrl = "https://buymeacoffee.com/pedrotepe";
-                                var supportLink = new Hyperlink(new Run(supportUrl)) { NavigateUri = new Uri(supportUrl) };
-                                supportLink.Click += (s4, e4) =>
-                                {
-                                    try { Process.Start(new ProcessStartInfo(supportLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
-                                };
-                                tb.Inlines.Add(supportLink);
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new LineBreak());
-
-                                tb.Inlines.Add(new Run("Beschreibung:"));
-                                tb.Inlines.Add(new LineBreak());
-                                tb.Inlines.Add(new Run("Kleine Tray-App zur Anzeige von Netzwerk- und IP-Informationen."));
-                            }
-
-                            if (this.FindName("InfoImage") is Image img)
-                            {
-                                try
-                                {
-                                    var imgPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "toolicon_transparent.png");
-                                    if (System.IO.File.Exists(imgPath))
-                                    {
-                                        var bmp = new BitmapImage();
-                                        bmp.BeginInit();
-                                        bmp.UriSource = new Uri(imgPath, UriKind.Absolute);
-                                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                                        bmp.EndInit();
-                                        img.Source = bmp;
-                                    }
-                                }
-                                catch { }
-                            }
-                        }
-                        catch { }
+                        InitializeInfoPage();
                     }
                 }
             }
@@ -619,6 +533,134 @@ namespace neTiPx
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
             this.Close();
+        }
+
+        private void InitializeInfoPage()
+        {
+            var asm = System.Reflection.Assembly.GetExecutingAssembly();
+            var ver = asm.GetName().Version?.ToString() ?? "?";
+
+            // Version Text setzen
+            if (this.FindName("InfoVersionText") is TextBlock vt)
+            {
+                vt.Text = "Version: " + ver;
+            }
+
+            // Rechte Spalte: Hauptinformationen
+            if (this.FindName("InfoText") is TextBlock tb)
+            {
+                tb.Inlines.Clear();
+                tb.FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
+                tb.FontSize = 14;
+
+                tb.Inlines.Add(new Run("neTiPx - Netzwerk Infos") { FontWeight = System.Windows.FontWeights.Bold, FontSize = 16 });
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new Run("Ein leichtgewichtiges Windows-Netzwerk-Informations- und Konfigurations-Tool"));
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new LineBreak());
+
+                tb.Inlines.Add(new Run("Beschreibung:") { FontWeight = System.Windows.FontWeights.Bold });
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new Run("neTiPx zeigt Informationen über aktive Netzwerkadapter im Tray an und ermöglicht die einfache Verwaltung von IP-Profilen für schnelle Netzwerkumschaltungen."));
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new LineBreak());
+
+                tb.Inlines.Add(new Run("Hauptfunktionen:") { FontWeight = System.Windows.FontWeights.Bold });
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new Run("• Netzwerk-Übersicht mit externen/lokalen IPs\n• Verwaltung mehrerer IP-Profile pro Adapter\n• Manuell oder DHCP Konfiguration\n• Mehrere IPs pro Profil\n• Intelligente IP-Validierung\n• Ping-Monitor (bis zu 10 Einträge)\n• WiFi-Netzwerk-Scanner mit Details"));
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new LineBreak());
+
+                tb.Inlines.Add(new Run("Lizenz:") { FontWeight = System.Windows.FontWeights.Bold });
+                tb.Inlines.Add(new LineBreak());
+                tb.Inlines.Add(new Run("Siehe LICENSE im GitHub-Repository"));
+            }
+
+            // Linke Spalte unten: Autor, Repository, Support
+            if (this.FindName("InfoLeftBottom") is StackPanel leftPanel)
+            {
+                leftPanel.Children.Clear();
+
+                // Autor
+                var autorLabel = new TextBlock
+                {
+                    Text = "Autor:",
+                    FontWeight = System.Windows.FontWeights.Bold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+                leftPanel.Children.Add(autorLabel);
+
+                var email = "github@hometepe.de";
+                var mailText = "Flecky13 (Pedro Tepe)";
+                var autorTextBlock = new TextBlock { FontSize = 11, Margin = new Thickness(0, 0, 0, 12), TextWrapping = System.Windows.TextWrapping.Wrap };
+                var mailLink = new Hyperlink(new Run(mailText)) { NavigateUri = new Uri("mailto:" + email) };
+                mailLink.Click += (s2, e2) =>
+                {
+                    try { Process.Start(new ProcessStartInfo(mailLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                };
+                autorTextBlock.Inlines.Add(mailLink);
+                leftPanel.Children.Add(autorTextBlock);
+
+                // Repository
+                var repoLabel = new TextBlock
+                {
+                    Text = "Repository:",
+                    FontWeight = System.Windows.FontWeights.Bold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+                leftPanel.Children.Add(repoLabel);
+
+                var repoUrl = "https://github.com/Flecky13/neTiPx-V2";
+                var repoTextBlock = new TextBlock { FontSize = 11, Margin = new Thickness(0, 0, 0, 12), TextWrapping = System.Windows.TextWrapping.Wrap };
+                var repoLink = new Hyperlink(new Run("GitHub")) { NavigateUri = new Uri(repoUrl) };
+                repoLink.Click += (s3, e3) =>
+                {
+                    try { Process.Start(new ProcessStartInfo(repoLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                };
+                repoTextBlock.Inlines.Add(repoLink);
+                leftPanel.Children.Add(repoTextBlock);
+
+                // Support
+                var supportLabel = new TextBlock
+                {
+                    Text = "Support:",
+                    FontWeight = System.Windows.FontWeights.Bold,
+                    FontSize = 12,
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+                leftPanel.Children.Add(supportLabel);
+
+                var supportUrl = "https://buymeacoffee.com/pedrotepe";
+                var supportTextBlock = new TextBlock { FontSize = 11, TextWrapping = System.Windows.TextWrapping.Wrap };
+                var supportLink = new Hyperlink(new Run("Buy Me a Coffee")) { NavigateUri = new Uri(supportUrl), Foreground = System.Windows.Media.Brushes.DodgerBlue };
+                supportLink.Click += (s4, e4) =>
+                {
+                    try { Process.Start(new ProcessStartInfo(supportLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
+                };
+                supportTextBlock.Inlines.Add(supportLink);
+                leftPanel.Children.Add(supportTextBlock);
+            }
+
+            // Icon laden
+            if (this.FindName("InfoImage") is Image img)
+            {
+                try
+                {
+                    var imgPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "toolicon_transparent.png");
+                    if (System.IO.File.Exists(imgPath))
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(imgPath, UriKind.Absolute);
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        img.Source = bmp;
+                    }
+                }
+                catch { }
+            }
         }
 
         private void LoadIpSettings()
@@ -2004,99 +2046,7 @@ namespace neTiPx
                     {
                         // Info tab is the fourth tab (index 3: 0=Adapter, 1=IP Settings, 2=Tools, 3=Info)
                         tc.SelectedIndex = 3;
-
-                        var asm = System.Reflection.Assembly.GetExecutingAssembly();
-                        var ver = asm.GetName().Version?.ToString() ?? "?";
-                        if (this.FindName("InfoText") is TextBlock tb)
-                        {
-                            tb.Inlines.Clear();
-                            tb.FontFamily = new System.Windows.Media.FontFamily("Consolas");
-                            tb.FontSize = 12;
-
-                            tb.Inlines.Add(new Run("neTiPx - Netzwerk Infos - by Pedro Tepe"));
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new LineBreak());
-
-                            if (this.FindName("InfoVersionText") is TextBlock vt)
-                            {
-                                vt.Text = "Version: " + ver;
-                            }
-
-                            tb.Inlines.Add(new Run("Lizenz:"));
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new Run("Dieses Programm steht unter der im Repository angegebenen Lizenz."));
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new LineBreak());
-
-                            tb.Inlines.Add(new Run("Autor:"));
-                            tb.Inlines.Add(new LineBreak());
-                            // Mailto hyperlink
-                            var email = "github@hometepe.de";
-                            var mailText = "Flecky13 - " + email;
-                            var mailLink = new Hyperlink(new Run(mailText)) { NavigateUri = new Uri("mailto:" + email) };
-                            mailLink.Click += (s2, e2) =>
-                            {
-                                try
-                                {
-                                    Process.Start(new ProcessStartInfo(mailLink.NavigateUri.AbsoluteUri) { UseShellExecute = true });
-                                }
-                                catch { }
-                            };
-                            tb.Inlines.Add(mailLink);
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new LineBreak());
-
-                            tb.Inlines.Add(new Run("Repository:"));
-                            tb.Inlines.Add(new LineBreak());
-                            var repoUrl = "https://github.com/Flecky13/neTiPx-V2";
-                            var repoLink = new Hyperlink(new Run(repoUrl)) { NavigateUri = new Uri(repoUrl) };
-                            repoLink.Click += (s3, e3) =>
-                            {
-                                try
-                                {
-                                    Process.Start(new ProcessStartInfo(repoLink.NavigateUri.AbsoluteUri) { UseShellExecute = true });
-                                }
-                                catch { }
-                            };
-                            tb.Inlines.Add(repoLink);
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new LineBreak());
-
-                            // Support link (BuyMeACoffee)
-                            tb.Inlines.Add(new Run("Support:"));
-                            tb.Inlines.Add(new LineBreak());
-                            var supportUrl = "https://buymeacoffee.com/pedrotepe";
-                            var supportLink = new Hyperlink(new Run(supportUrl)) { NavigateUri = new Uri(supportUrl) };
-                            supportLink.Click += (s4, e4) =>
-                            {
-                                try { Process.Start(new ProcessStartInfo(supportLink.NavigateUri.AbsoluteUri) { UseShellExecute = true }); } catch { }
-                            };
-                            tb.Inlines.Add(supportLink);
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new LineBreak());
-
-                            tb.Inlines.Add(new Run("Beschreibung:"));
-                            tb.Inlines.Add(new LineBreak());
-                            tb.Inlines.Add(new Run("Kleine Tray-App zur Anzeige von Netzwerk- und IP-Informationen."));
-                        }
-
-                        if (this.FindName("InfoImage") is Image img)
-                        {
-                            try
-                            {
-                                var imgPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", "toolicon_transparent.png");
-                                if (System.IO.File.Exists(imgPath))
-                                {
-                                    var bmp = new BitmapImage();
-                                    bmp.BeginInit();
-                                    bmp.UriSource = new Uri(imgPath, UriKind.Absolute);
-                                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                                    bmp.EndInit();
-                                    img.Source = bmp;
-                                }
-                            }
-                            catch { }
-                        }
+                        InitializeInfoPage();
                     }
                     finally
                     {
