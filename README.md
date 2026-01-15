@@ -26,10 +26,21 @@ Wesentliche Funktionen
 - **Mehrere IP-Konfigurationen** als separate Tabs (max. 10)
 - Jedes Profil mit editierbarem Namen
 - **Modus-Auswahl**: DHCP oder Manuell (IPv4)
-- Bei manueller Konfiguration: IP, Subnetz, Gateway, DNS
+- Bei manueller Konfiguration:
+  - **Einzelne Gateway-Adresse** pro Profil
+  - **Einzelne DNS-Adresse** pro Profil
+  - **Mehrere IP/Subnetz-Kombinationen** pro Profil
+    - Hinzufügen weiterer IPs mit "➕ Hinzufügen"-Button
+    - Entfernen einzelner IPs mit "✕"-Button
+- **Intelligente Validierung**:
+  - Überprüft IP-Adressen und Subnetmasken auf Gültigkeit
+  - Stellt sicher, dass Gateway im gleichen Subnetz wie die erste IP liegt
+  - Zeigt detaillierte Fehlermeldungen bei ungültigen Eingaben
 - **Gateway-Erreichbarkeitsprüfung**
   - Zeigt Ping-Status mit RTT in ms
 - **Ein-Klick-Anwendung** auf Netzwerkkarte (erfordert Admin-Rechte)
+  - Setzt erste IP als Primär-Adresse
+  - Fügt zusätzliche IPs automatisch hinzu
 
 ### Ping-Monitor (Tools → Ping)
 - **Bis zu 6 gleichzeitige Ping-Überwachungen**
@@ -68,11 +79,17 @@ Adapter2 = WLAN
 IpProfileNames = Office,Home
 Office.Adapter = Ethernet
 Office.Mode = Manual
-Office.IP = 192.168.1.50
-Office.Subnet = 255.255.255.0
+Office.IP_1 = 192.168.1.50
+Office.Subnet_1 = 255.255.255.0
+Office.IP_2 = 192.168.1.51
+Office.Subnet_2 = 255.255.255.0
 Office.GW = 192.168.1.1
 Office.DNS = 8.8.8.8
+Home.Adapter = WLAN
+Home.Mode = DHCP
 ```
+
+**Hinweis:** Pro Profil können beliebig viele IP/Subnetz-Kombinationen definiert werden (`IP_1`/`Subnet_1`, `IP_2`/`Subnet_2`, etc.). Gateway und DNS gelten für alle IPs des Profils.
 ![Alt text](Images/Config.png)
 
 
@@ -83,7 +100,14 @@ Bereich `IP Settings`, in dem du mehrere IP-Profile als Tabs anlegen kannst. Jed
 - Ein editierbarer Profilname (wird als Schlüssel in `config.ini` verwendet)
 - Auswahl eines Adapters (gefüllt aus `Adapter1`/`Adapter2`)
 - Modus: `DHCP` oder `Manuell` (nur IPv4)
-- Bei `Manuell`: Felder für `IP`, `Subnetz`, `Gateway`, `DNS`
+- Bei `Manuell`:
+  - **Gateway-Feld** (einmalig pro Profil, gilt für alle IPs)
+  - **DNS-Feld** (einmalig pro Profil)
+  - **IP-Adressen & Subnetze Tabelle**:
+    - Mehrere Zeilen für verschiedene IP/Subnetz-Kombinationen
+    - "➕ Hinzufügen"-Button zum Hinzufügen neuer IP-Adressen (nur im Manuell-Modus aktiv)
+    - "✕"-Button zum Entfernen einzelner IP-Einträge
+  - **Automatische Validierung** beim Speichern und Anwenden
 
 ![Alt text](Images/IP_Settings.png)
 
@@ -91,13 +115,24 @@ Bereich `IP Settings`, in dem du mehrere IP-Profile als Tabs anlegen kannst. Jed
 ## Anwenden einer Konfiguration
 ----------------------------
 - Wähle das gewünschte Profil-Tab und klicke `Anwenden`.
-- Die Konfiguration wird zunächst auf die Netzwerkkarte geschrieben.
+- Die App validiert automatisch:
+  - Gültigkeit der IP-Adressen und Subnetmasken
+  - Ob das Gateway im gleichen Subnetz wie die erste IP liegt
+  - Bei Fehlern werden detaillierte Meldungen angezeigt
+- Die Konfiguration wird auf die Netzwerkkarte geschrieben:
+  - Erste IP wird als Primär-Adresse gesetzt
+  - Weitere IPs werden als zusätzliche Adressen hinzugefügt
+  - Gateway und DNS werden konfiguriert
+- Angewendete Profile werden grün markiert
 
 
 ## Weitere Hinweise
 ----------------
 - Für das Anwenden von IP-Konfigurationen wird `netsh` verwendet; die App fordert beim Ausführen der Änderung Administratorrechte an.
 - Beim Speichern werden die IP-Profile in `config.ini` (Schlüssel `IpProfileNames` und `<ProfileName>.<Feld>`) persistiert.
+- **Mehrere IPs:** Pro Profil können mehrere IP-Adressen konfiguriert werden (z.B. `Office.IP_1`, `Office.IP_2`, etc.)
+- **Validierung:** Die App überprüft automatisch, ob Gateway und IP-Adressen im selben Subnetz liegen
+- **DHCP-Modus:** Im DHCP-Modus sind die IP-Eingabefelder und der "Hinzufügen"-Button deaktiviert
 
 ### Lizenz & Kontakt
 ----------------
