@@ -3,6 +3,39 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="neTiPx - Netwerk Infos - Configuration" Height="580" Width="750" WindowStartupLocation="CenterScreen">
     <Window.Resources>
+        <!-- Style for dynamically created TabItems to prevent binding errors -->
+        <Style x:Key="DynamicTabItemStyle" TargetType="TabItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border Name="Border" 
+                                BorderThickness="1,1,1,0" 
+                                BorderBrush="#CCCCCC" 
+                                Background="White"
+                                CornerRadius="4,4,0,0"
+                                Padding="12,4,12,4"
+                                Margin="0,0,2,0">
+                            <ContentPresenter x:Name="ContentSite"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Center"
+                                              ContentSource="Header"
+                                              Margin="0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#F0F0F0"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="#999999"/>
+                                <Setter TargetName="Border" Property="BorderThickness" Value="1,1,1,0"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="#F5F5F5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
         <!-- Gemeinsame Styles für Ping-Header und Zellen -->
         <Style x:Key="PingHeaderText" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="Bold"/>

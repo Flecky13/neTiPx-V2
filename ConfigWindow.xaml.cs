@@ -832,6 +832,12 @@ namespace neTiPx
             panel.Children.Add(spIpSection);
 
             var tab = new TabItem { Header = $"IP #{index}", Content = scrollViewer };
+            
+            // Apply custom style to prevent binding errors when TabItem is created without parent TabControl
+            if (this.TryFindResource("DynamicTabItemStyle") is Style tabItemStyle)
+            {
+                tab.Style = tabItemStyle;
+            }
 
             // Populate adapters from global INI Adapter1/Adapter2
             if (iniValues.TryGetValue("Adapter1", out var a1) && !string.IsNullOrEmpty(a1)) cbAdapter.Items.Add(new ComboBoxItem { Content = a1, Tag = a1 });
