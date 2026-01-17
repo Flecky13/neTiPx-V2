@@ -82,6 +82,11 @@ namespace neTiPx
             
             // Cache the style for dynamic tabs to avoid repeated resource lookups
             _dynamicTabItemStyle = this.TryFindResource("DynamicTabItemStyle") as Style;
+            if (_dynamicTabItemStyle == null)
+            {
+                // Log warning if style not found - tabs will use default WPF style
+                System.Diagnostics.Trace.WriteLine("[ConfigWindow] Warning: DynamicTabItemStyle not found. Dynamic tabs will use default WPF style which may cause binding errors.");
+            }
             
             // Prevent event handlers from reacting during initialization
             EnterSuspendEvents();
