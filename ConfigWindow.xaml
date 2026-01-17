@@ -3,7 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="neTiPx - Netwerk Infos - Configuration" Height="580" Width="750" WindowStartupLocation="CenterScreen">
     <Window.Resources>
-        <!-- Style for dynamically created TabItems to prevent binding errors -->
+        <!-- Style for dynamically created TabItems to prevent binding errors.
+             When TabItems are created programmatically (in CreateIpTab method) before being added to IpTabsControl,
+             WPF's default TabItem template tries to bind to TabControl.TabStripPlacement via RelativeSource,
+             which fails and generates binding errors. This custom template avoids ancestor bindings. -->
         <Style x:Key="DynamicTabItemStyle" TargetType="TabItem">
             <Setter Property="Template">
                 <Setter.Value>

@@ -26,6 +26,7 @@ namespace neTiPx
         // Dynamic IP tabs
         private const int MaxIpTabs = 10;
         private readonly List<IpTabData> _ipTabs = new List<IpTabData>();
+        private Style? _dynamicTabItemStyle; // Cached style for dynamic tabs
 
         // Ping tools
         private const int MaxPingEntries = 10;
@@ -78,6 +79,10 @@ namespace neTiPx
         public ConfigWindow()
         {
             InitializeComponent();
+            
+            // Cache the style for dynamic tabs to avoid repeated resource lookups
+            _dynamicTabItemStyle = this.TryFindResource("DynamicTabItemStyle") as Style;
+            
             // Prevent event handlers from reacting during initialization
             EnterSuspendEvents();
             try
@@ -833,10 +838,10 @@ namespace neTiPx
 
             var tab = new TabItem { Header = $"IP #{index}", Content = scrollViewer };
             
-            // Apply custom style to prevent binding errors when TabItem is created without parent TabControl
-            if (this.TryFindResource("DynamicTabItemStyle") is Style tabItemStyle)
+            // Apply cached custom style to prevent binding errors when TabItem is created without parent TabControl
+            if (_dynamicTabItemStyle != null)
             {
-                tab.Style = tabItemStyle;
+                tab.Style = _dynamicTabItemStyle;
             }
 
             // Populate adapters from global INI Adapter1/Adapter2
