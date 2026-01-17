@@ -832,7 +832,7 @@ namespace neTiPx
             panel.Children.Add(spIpSection);
 
             var tab = new TabItem { Header = $"IP #{index}", Content = scrollViewer };
-            
+
             // Apply custom style to prevent binding errors when TabItem is created without parent TabControl
             if (this.TryFindResource("DynamicTabItemStyle") is Style tabItemStyle)
             {
@@ -2177,6 +2177,69 @@ namespace neTiPx
             {
                 Trace.WriteLine($"[ConfigWindow] Error in SelectToolsTab: {ex.Message}");
                 Trace.WriteLine($"[ConfigWindow] Stack Trace: {ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
+        /// Startet automatische Update-Prüfung beim App-Start (ohne Button-UI)
+        /// </summary>
+        public async Task CheckForUpdatesAutoAsync()
+        {
+            try
+            {
+                Trace.WriteLine("[UpdateCheck] ========== Automatische Update-Prüfung gestartet ==========");
+                Console.WriteLine("[UpdateCheck] ========== Automatische Update-Prüfung gestartet ==========");
+
+                var currentVersion = GetCurrentVersion();
+                Trace.WriteLine($"[UpdateCheck] Aktuelle Version: {currentVersion}");
+                Console.WriteLine($"[UpdateCheck] Aktuelle Version: {currentVersion}");
+
+                var latestRelease = await GetLatestGitHubReleaseAsync();
+
+                if (latestRelease == null)
+                {
+                    Trace.WriteLine("[UpdateCheck] Fehler: Konnte keine Release-Informationen abrufen");
+                    Console.WriteLine("[UpdateCheck] Fehler: Konnte keine Release-Informationen abrufen");
+                    return;
+                }
+
+                Trace.WriteLine($"[UpdateCheck] GitHub Tag: {latestRelease.TagName}");
+                Console.WriteLine($"[UpdateCheck] GitHub Tag: {latestRelease.TagName}");
+                var latestVersion = ParseVersion(latestRelease.TagName);
+                Trace.WriteLine($"[UpdateCheck] Geparste Version: {latestVersion}");
+                Console.WriteLine($"[UpdateCheck] Geparste Version: {latestVersion}");
+
+                if (latestVersion > currentVersion)
+                {
+                    Trace.WriteLine($"[UpdateCheck] Neue Version verfügbar: {latestVersion} > {currentVersion}");
+                    Console.WriteLine($"[UpdateCheck] Neue Version verfügbar: {latestVersion} > {currentVersion}");
+
+                    // Zeige Update-Dialog
+                    var dialog = new UpdateCheckDialog(currentVersion.ToString(), latestVersion.ToString());
+
+                    var result = dialog.ShowDialog();
+
+                    if (result == true && dialog.UserWantsUpdate)
+                    {
+                        Trace.WriteLine($"[UpdateCheck] Benutzer möchte updaten - zeige Info Seite");
+                        Console.WriteLine($"[UpdateCheck] Benutzer möchte updaten - zeige Info Seite");
+
+                        // Öffne Info-Tab in neuem ConfigWindow
+                        SelectInfoTab();
+                        this.ShowDialog();
+                    }
+                }
+                else
+                {
+                    Trace.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
+                    Console.WriteLine($"[UpdateCheck] Bereits aktuell: {currentVersion} >= {latestVersion}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[UpdateCheck] Fehler bei Auto-Check: {ex.Message}");
+                Console.WriteLine($"[UpdateCheck] Fehler bei Auto-Check: {ex.Message}");
+                // Fehler bei Auto-Check werden stillschweigend ignoriert
             }
         }
 

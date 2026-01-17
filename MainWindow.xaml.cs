@@ -91,6 +91,28 @@ namespace neTiPx
         private void MainWindow_ContentRendered(object? sender, EventArgs e)
         {
             PositionWindowBottomRight();
+
+            // Automatische Update-Prüfung beim App-Start
+            _ = CheckForUpdatesOnStartupAsync();
+        }
+
+        private async Task CheckForUpdatesOnStartupAsync()
+        {
+            try
+            {
+                // Kurze Verzögerung um sicherzustellen, dass UI vollständig geladen ist
+                await Task.Delay(500);
+
+                // Erstelle ConfigWindow nur für Update-Prüfung (wird nicht angezeigt)
+                var cfg = new ConfigWindow();
+                cfg.Owner = this;
+                await cfg.CheckForUpdatesAutoAsync();
+                cfg.Close();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindow] Fehler bei automatischer Update-Prüfung: {ex.Message}");
+            }
         }
 
         private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
