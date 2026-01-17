@@ -79,7 +79,7 @@ namespace neTiPx
         public ConfigWindow()
         {
             InitializeComponent();
-            
+
             // Cache the style for dynamic tabs to avoid repeated resource lookups
             _dynamicTabItemStyle = this.TryFindResource("DynamicTabItemStyle") as Style;
             if (_dynamicTabItemStyle == null)
@@ -87,7 +87,7 @@ namespace neTiPx
                 // Log warning if style not found - tabs will use default WPF style
                 System.Diagnostics.Trace.WriteLine("[ConfigWindow] Warning: DynamicTabItemStyle not found. Dynamic tabs will use default WPF style which may cause binding errors.");
             }
-            
+
             // Prevent event handlers from reacting during initialization
             EnterSuspendEvents();
             try
@@ -842,7 +842,7 @@ namespace neTiPx
             panel.Children.Add(spIpSection);
 
             var tab = new TabItem { Header = $"IP #{index}", Content = scrollViewer };
-            
+
             // Apply cached custom style to prevent binding errors when TabItem is created without parent TabControl
             if (_dynamicTabItemStyle != null)
             {
