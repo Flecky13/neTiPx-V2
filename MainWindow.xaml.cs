@@ -152,6 +152,12 @@ namespace neTiPx
 
                     // Daten aktualisieren via ViewModel
                     UpdateGui();
+
+                    // Falls ConfigWindow offen und IP Settings Tab aktiv: Gateway-Ping-Timer starten
+                    if (_activeConfigWindow != null && _activeConfigWindow.IsLoaded)
+                    {
+                        _activeConfigWindow.RestartGatewayPingTimerIfIpTabActive();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -169,6 +175,11 @@ namespace neTiPx
             {
                 // Komplett ausblenden
                 this.Hide();
+                // Falls ConfigWindow offen: Gateway-Ping-Timer stoppen
+                if (_activeConfigWindow != null && _activeConfigWindow.IsLoaded)
+                {
+                    _activeConfigWindow.StopAllGatewayPingTimers();
+                }
             });
         }
 

@@ -16,6 +16,45 @@ namespace neTiPx
 {
     public partial class ConfigWindow : Window
     {
+    // --- Gateway-Ping-Timer Steuerung für MainWindow ---
+    public void StopAllGatewayPingTimers()
+    {
+        foreach (var t in _ipTabs)
+        {
+            try { t.PingTimer?.Stop(); } catch { }
+        }
+    }
+
+    // Stoppe Gateway-Ping-Timer auch beim Minimieren
+    private void ConfigWindow_StateChanged(object? sender, EventArgs e)
+    {
+        if (this.WindowState == WindowState.Minimized)
+        {
+            StopAllGatewayPingTimers();
+        }
+        else if (this.WindowState == WindowState.Normal || this.WindowState == WindowState.Maximized)
+        {
+            RestartGatewayPingTimerIfIpTabActive();
+        }
+    }
+
+    public void RestartGatewayPingTimerIfIpTabActive()
+    {
+        if (this.FindName("TabControlMain") is TabControl tc && tc.SelectedItem is TabItem ti)
+        {
+            var header = ti.Header?.ToString() ?? string.Empty;
+            bool isIpSettingsTab = header.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                  header.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (isIpSettingsTab && this.FindName("IpTabsControl") is TabControl ipTabCtrl && ipTabCtrl.SelectedItem is TabItem selectedIpTab)
+            {
+                var selectedData = _ipTabs.FirstOrDefault(t => t.Tab == selectedIpTab);
+                if (selectedData != null)
+                {
+                    StartGatewayPingTimer(selectedData);
+                }
+            }
+        }
+    }
         private readonly List<CheckBox> _checkboxes = new List<CheckBox>();
         private int _suspendEventCount = 0;
 
@@ -78,6 +117,7 @@ namespace neTiPx
         public ConfigWindow()
         {
             InitializeComponent();
+            this.StateChanged += ConfigWindow_StateChanged;
             // Prevent event handlers from reacting during initialization
             EnterSuspendEvents();
             try
@@ -1806,6 +1846,7 @@ namespace neTiPx
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             try { StopAllPingTimers(); } catch { }
+            try { StopAllGatewayPingTimers(); } catch { }
             base.OnClosing(e);
         }
 
