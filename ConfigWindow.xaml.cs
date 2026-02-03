@@ -112,6 +112,7 @@ namespace neTiPx
             public TextBox? TxtDNS;
             public System.Windows.Threading.DispatcherTimer? PingTimer;
             public Label? LblGwStatus;
+            public bool HasChanges = false;
         }
 
         public ConfigWindow()
@@ -304,6 +305,16 @@ namespace neTiPx
                         var iniPath = ConfigFileHelper.GetConfigIniPath();
                         var values = ReadIniToDict(iniPath);
                         SaveIpSettings(values);
+
+                        // Reset change markers after successful save
+                        foreach (var t in _ipTabs)
+                        {
+                            t.HasChanges = false;
+                            if (t.Tab != null && t.Tab.Header is string header)
+                            {
+                                t.Tab.Header = header.Replace(" *", "");
+                            }
+                        }
                     }
                     catch { }
 
@@ -408,6 +419,64 @@ namespace neTiPx
             if (EventsSuspended) return;
             try
             {
+                // Check if we're leaving the IP Settings tab and if there are changes
+                if (e.RemovedItems.Count > 0 && e.RemovedItems[0] is TabItem oldTab)
+                {
+                    var oldHeader = oldTab.Header?.ToString() ?? string.Empty;
+                    bool wasIpSettingsTab = oldHeader.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                                           oldHeader.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    if (wasIpSettingsTab)
+                    {
+                        // Check if any tab has changes
+                        bool hasChanges = _ipTabs.Any(t => t.Tab?.Header?.ToString()?.Contains("*") == true) || _ipTabs.Any(t => t.HasChanges);
+                        if (hasChanges)
+                        {
+                            var result = MessageBox.Show(
+                                "Sie haben Änderungen vorgenommen.\n\nMöchten Sie diese speichern?",
+                                "Änderungen speichern?",
+                                MessageBoxButton.YesNo,
+                                MessageBoxImage.Question);
+
+                            if (result == MessageBoxResult.Yes)
+                            {
+                                // Save changes
+                                try
+                                {
+                                    var iniPath = ConfigFileHelper.GetConfigIniPath();
+                                    var values = ReadIniToDict(iniPath);
+                                    SaveIpSettings(values);
+                                    // Reset change markers
+                                    foreach (var t in _ipTabs)
+                                    {
+                                        t.HasChanges = false;
+                                        if (t.Tab != null && t.Tab.Header is string header)
+                                        {
+                                            t.Tab.Header = header.Replace(" *", "");
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    MessageBox.Show($"Fehler beim Speichern: {ex.Message}");
+                                }
+                            }
+                            else
+                            {
+                                // Discard changes - reset markers
+                                foreach (var t in _ipTabs)
+                                {
+                                    t.HasChanges = false;
+                                    if (t.Tab != null && t.Tab.Header is string header)
+                                    {
+                                        t.Tab.Header = header.Replace(" *", "");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Only handle if the event originates from the TabControl itself
                 if (e.OriginalSource != sender) return;
                 if (sender is TabControl tc && tc.SelectedItem is TabItem ti)
@@ -549,6 +618,17 @@ namespace neTiPx
                 // Save IP settings into the same dictionary and persist
                 SaveIpSettings(values);
 
+                // Reset changes flag for all tabs after successful save
+                foreach (var t in _ipTabs)
+                {
+                    t.HasChanges = false;
+                    // Remove asterisk from tab header
+                    if (t.Tab != null && t.Tab.Header is string header)
+                    {
+                        t.Tab.Header = header.Replace(" *", "");
+                    }
+                }
+
                 // If opened from MainWindow, refresh its display immediately
                 try
                 {
@@ -572,6 +652,54 @@ namespace neTiPx
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            // Check if any IP tab has changes
+            bool hasChanges = _ipTabs.Any(t => t.Tab?.Header?.ToString()?.Contains("*") == true) || _ipTabs.Any(t => t.HasChanges);
+            if (hasChanges)
+            {
+                var result = MessageBox.Show(
+                    "Sie haben Änderungen vorgenommen.\n\nMöchten Sie diese speichern, bevor Sie das Fenster schliessen?",
+                    "Änderungen speichern?",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    // Save changes
+                    try
+                    {
+                        var iniPath = ConfigFileHelper.GetConfigIniPath();
+                        var values = ReadIniToDict(iniPath);
+                        SaveIpSettings(values);
+                        // Reset change markers
+                        foreach (var t in _ipTabs)
+                        {
+                            t.HasChanges = false;
+                            if (t.Tab != null && t.Tab.Header is string header)
+                            {
+                                t.Tab.Header = header.Replace(" *", "");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Fehler beim Speichern: {ex.Message}");
+                        return;
+                    }
+                }
+                else
+                {
+                    // Discard changes - reset markers
+                    foreach (var t in _ipTabs)
+                    {
+                        t.HasChanges = false;
+                        if (t.Tab != null && t.Tab.Header is string header)
+                        {
+                            t.Tab.Header = header.Replace(" *", "");
+                        }
+                    }
+                }
+            }
+
             this.Close();
         }
 
@@ -885,10 +1013,13 @@ namespace neTiPx
             if (cbAdapter.Items.Count > 0) cbAdapter.SelectedIndex = 0;
 
             // Wire events
-            cbAdapter.SelectionChanged += (s, e) => { if (!EventsSuspended) { if (rbManual.IsChecked == true) { LoadSystemValuesIntoTab(data); } else if (rbDhcp.IsChecked == true) { LoadSystemValuesIntoTab(data); } } };
-            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, false); btnAddIp.IsEnabled = false; LoadSystemValuesIntoTab(data); } };
-            rbManual.Checked += (s, e) => { if (!EventsSuspended) { SetIpFieldsEnabledForTab(data, true); btnAddIp.IsEnabled = true; LoadSystemValuesIntoTab(data); } };
-            btnAddIp.Click += (s, e) => { AddIpEntryToTab(data); };
+            cbAdapter.SelectionChanged += (s, e) => { if (!EventsSuspended) { MarkIpTabAsChanged(data); if (rbManual.IsChecked == true) { LoadSystemValuesIntoTab(data); } else if (rbDhcp.IsChecked == true) { LoadSystemValuesIntoTab(data); } } };
+            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) { MarkIpTabAsChanged(data); SetIpFieldsEnabledForTab(data, false); btnAddIp.IsEnabled = false; LoadSystemValuesIntoTab(data); } };
+            rbManual.Checked += (s, e) => { if (!EventsSuspended) { MarkIpTabAsChanged(data); SetIpFieldsEnabledForTab(data, true); btnAddIp.IsEnabled = true; LoadSystemValuesIntoTab(data); } };
+            btnAddIp.Click += (s, e) => { MarkIpTabAsChanged(data); AddIpEntryToTab(data); };
+            txtName.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
+            txtGw.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
+            txtDns.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
 
             data.Tab = tab;
             data.AdapterCombo = cbAdapter;
@@ -1085,6 +1216,24 @@ namespace neTiPx
             }
         }
 
+        private void MarkIpTabAsChanged(IpTabData data)
+        {
+            if (!EventsSuspended)
+            {
+                data.HasChanges = true;
+                // Debug: Add a visual indicator
+                if (data.Tab != null)
+                {
+                    // Mark tab header with asterisk if not already marked
+                    var header = data.Tab.Header?.ToString() ?? string.Empty;
+                    if (!header.Contains("*"))
+                    {
+                        data.Tab.Header = header + " *";
+                    }
+                }
+            }
+        }
+
         private void AddIpEntryToTab(IpTabData data, string ipAddress = "", string subnet = "")
         {
             if (data == null || data.IpEntriesPanel == null) return;
@@ -1117,9 +1266,14 @@ namespace neTiPx
             // Remove button click handler
             btnRemove.Click += (s, e) =>
             {
+                MarkIpTabAsChanged(data);
                 data.IpEntriesPanel.Children.Remove(rowGrid);
                 data.IpEntries.Remove(entry);
             };
+
+            // Add change tracking for IP and Subnet fields
+            txtIP.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
+            txtSubnet.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
 
             // Add to panel
             data.IpEntriesPanel.Children.Add(rowGrid);
@@ -1243,6 +1397,10 @@ namespace neTiPx
                 MessageBox.Show($"Maximal {MaxIpTabs} IP-Tabs erlaubt.");
                 return;
             }
+
+            // Mark that changes have been made (new profile created)
+            MarkIpTabAsChanged(new IpTabData { HasChanges = true });
+
             EnterSuspendEvents();
             try
             {
@@ -1264,6 +1422,8 @@ namespace neTiPx
                 if (data != null)
                 {
                     LoadSystemValuesIntoTab(data);
+                    // Mark the new tab as changed since it was just created
+                    MarkIpTabAsChanged(data);
                 }
             }
         }
@@ -1276,6 +1436,19 @@ namespace neTiPx
                 var data = _ipTabs.FirstOrDefault(t => t.Tab == ti);
                 if (data != null)
                 {
+                    // Mark that changes have been made (profile deleted)
+                    // Get a different tab to mark as changed
+                    var otherTab = _ipTabs.FirstOrDefault(t => t != data);
+                    if (otherTab != null)
+                    {
+                        MarkIpTabAsChanged(otherTab);
+                    }
+                    else
+                    {
+                        // If this is the last tab, mark it before deleting
+                        MarkIpTabAsChanged(data);
+                    }
+
                     _ipTabs.Remove(data);
                     IpTabsControl.Items.Remove(data.Tab);
                 }
