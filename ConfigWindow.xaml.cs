@@ -57,6 +57,7 @@ namespace neTiPx
     }
         private readonly List<CheckBox> _checkboxes = new List<CheckBox>();
         private int _suspendEventCount = 0;
+        private bool _adapterTabHasChanges = false;
 
         private bool EventsSuspended => _suspendEventCount > 0;
         private void EnterSuspendEvents() => _suspendEventCount++;
@@ -419,13 +420,52 @@ namespace neTiPx
             if (EventsSuspended) return;
             try
             {
-                // Check if we're leaving the IP Settings tab and if there are changes
+                // Check if we're leaving the Adapter tab and if there are changes
                 if (e.RemovedItems.Count > 0 && e.RemovedItems[0] is TabItem oldTab)
                 {
                     var oldHeader = oldTab.Header?.ToString() ?? string.Empty;
+                    bool wasAdapterTab = oldHeader.IndexOf("Adapter", StringComparison.OrdinalIgnoreCase) >= 0;
                     bool wasIpSettingsTab = oldHeader.IndexOf("IP", StringComparison.OrdinalIgnoreCase) >= 0 &&
                                            oldHeader.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0;
 
+                    // Check Adapter Tab for changes
+                    if (wasAdapterTab && _adapterTabHasChanges)
+                    {
+                        var result = MessageBox.Show(
+                            "Sie haben Änderungen vorgenommen.\n\nMöchten Sie diese speichern?",
+                            "Änderungen speichern?",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            // Save changes
+                            try
+                            {
+                                var selected = _checkboxes.Where(c => c.IsChecked == true).Select(c => c.Tag?.ToString()).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                                var iniPath = ConfigFileHelper.GetConfigIniPath();
+                                var values = ReadIniToDict(iniPath);
+
+                                // Save adapter selections
+                                values["Adapter1"] = (selected.Count > 0 ? (selected[0] ?? string.Empty) : string.Empty);
+                                values["Adapter2"] = (selected.Count > 1 ? (selected[1] ?? string.Empty) : string.Empty);
+
+                                SaveIpSettings(values);
+                                _adapterTabHasChanges = false;
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Fehler beim Speichern: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            // Discard changes
+                            _adapterTabHasChanges = false;
+                        }
+                    }
+
+                    // Check IP Settings Tab for changes
                     if (wasIpSettingsTab)
                     {
                         // Check if any tab has changes
@@ -600,6 +640,12 @@ namespace neTiPx
                 }
                 MessageBox.Show("Maximal 2 Adapter können ausgewählt werden.");
             }
+
+            // Mark adapter tab as changed
+            if (!EventsSuspended)
+            {
+                _adapterTabHasChanges = true;
+            }
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
@@ -629,6 +675,9 @@ namespace neTiPx
                     }
                 }
 
+                // Reset adapter tab changes flag
+                _adapterTabHasChanges = false;
+
                 // If opened from MainWindow, refresh its display immediately
                 try
                 {
@@ -652,8 +701,11 @@ namespace neTiPx
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            // Check if any IP tab has changes
-            bool hasChanges = _ipTabs.Any(t => t.Tab?.Header?.ToString()?.Contains("*") == true) || _ipTabs.Any(t => t.HasChanges);
+            // Check if any IP tab has changes or adapter tab has changes
+            bool hasIpChanges = _ipTabs.Any(t => t.Tab?.Header?.ToString()?.Contains("*") == true) || _ipTabs.Any(t => t.HasChanges);
+            bool hasAdapterChanges = _adapterTabHasChanges;
+            bool hasChanges = hasIpChanges || hasAdapterChanges;
+
             if (hasChanges)
             {
                 var result = MessageBox.Show(
@@ -667,9 +719,16 @@ namespace neTiPx
                     // Save changes
                     try
                     {
+                        var selected = _checkboxes.Where(c => c.IsChecked == true).Select(c => c.Tag?.ToString()).Where(s => !string.IsNullOrEmpty(s)).ToList();
                         var iniPath = ConfigFileHelper.GetConfigIniPath();
                         var values = ReadIniToDict(iniPath);
+
+                        // Save adapter selections
+                        values["Adapter1"] = (selected.Count > 0 ? (selected[0] ?? string.Empty) : string.Empty);
+                        values["Adapter2"] = (selected.Count > 1 ? (selected[1] ?? string.Empty) : string.Empty);
+
                         SaveIpSettings(values);
+
                         // Reset change markers
                         foreach (var t in _ipTabs)
                         {
@@ -679,6 +738,7 @@ namespace neTiPx
                                 t.Tab.Header = header.Replace(" *", "");
                             }
                         }
+                        _adapterTabHasChanges = false;
                     }
                     catch (Exception ex)
                     {
@@ -697,6 +757,7 @@ namespace neTiPx
                             t.Tab.Header = header.Replace(" *", "");
                         }
                     }
+                    _adapterTabHasChanges = false;
                 }
             }
 
