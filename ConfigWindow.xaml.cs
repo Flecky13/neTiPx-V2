@@ -58,6 +58,7 @@ namespace neTiPx
         private readonly List<CheckBox> _checkboxes = new List<CheckBox>();
         private int _suspendEventCount = 0;
         private bool _adapterTabHasChanges = false;
+        private bool _pingTabHasChanges = false;
 
         private bool EventsSuspended => _suspendEventCount > 0;
         private void EnterSuspendEvents() => _suspendEventCount++;
@@ -517,6 +518,43 @@ namespace neTiPx
                     }
                 }
 
+                // Check if we're leaving the Tools/Ping tab and if there are changes
+                if (e.RemovedItems.Count > 0 && e.RemovedItems[0] is TabItem removedTab)
+                {
+                    var removedHeader = removedTab.Header?.ToString() ?? string.Empty;
+                    bool wasToolsTab = removedHeader.IndexOf("Tools", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    if (wasToolsTab && _pingTabHasChanges)
+                    {
+                        var result = MessageBox.Show(
+                            "Sie haben Änderungen vorgenommen.\n\nMöchten Sie diese speichern?",
+                            "Änderungen speichern?",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            // Save changes
+                            try
+                            {
+                                var iniPath = ConfigFileHelper.GetConfigIniPath();
+                                var values = ReadIniToDict(iniPath);
+                                SaveIpSettings(values);
+                                _pingTabHasChanges = false;
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Fehler beim Speichern: {ex.Message}");
+                            }
+                        }
+                        else
+                        {
+                            // Discard changes
+                            _pingTabHasChanges = false;
+                        }
+                    }
+                }
+
                 // Only handle if the event originates from the TabControl itself
                 if (e.OriginalSource != sender) return;
                 if (sender is TabControl tc && tc.SelectedItem is TabItem ti)
@@ -678,6 +716,9 @@ namespace neTiPx
                 // Reset adapter tab changes flag
                 _adapterTabHasChanges = false;
 
+                // Reset ping tab changes flag
+                _pingTabHasChanges = false;
+
                 // If opened from MainWindow, refresh its display immediately
                 try
                 {
@@ -701,10 +742,11 @@ namespace neTiPx
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
-            // Check if any IP tab has changes or adapter tab has changes
+            // Check if any IP tab has changes or adapter tab has changes or ping tab has changes
             bool hasIpChanges = _ipTabs.Any(t => t.Tab?.Header?.ToString()?.Contains("*") == true) || _ipTabs.Any(t => t.HasChanges);
             bool hasAdapterChanges = _adapterTabHasChanges;
-            bool hasChanges = hasIpChanges || hasAdapterChanges;
+            bool hasPingChanges = _pingTabHasChanges;
+            bool hasChanges = hasIpChanges || hasAdapterChanges || hasPingChanges;
 
             if (hasChanges)
             {
@@ -739,6 +781,7 @@ namespace neTiPx
                             }
                         }
                         _adapterTabHasChanges = false;
+                        _pingTabHasChanges = false;
                     }
                     catch (Exception ex)
                     {
@@ -757,6 +800,8 @@ namespace neTiPx
                             t.Tab.Header = header.Replace(" *", "");
                         }
                     }
+                    _adapterTabHasChanges = false;
+                    _pingTabHasChanges = false;
                     _adapterTabHasChanges = false;
                 }
             }
@@ -1774,6 +1819,9 @@ namespace neTiPx
             // hook events
             txtIp.TextChanged += (s, ev) =>
             {
+                // Mark ping tab as changed
+                if (!EventsSuspended) _pingTabHasChanges = true;
+
                 var ip = txtIp.Text.Trim();
                 bool valid = IsValidHostOrIP(ip);
                 // disable checkbox if invalid
@@ -1793,6 +1841,9 @@ namespace neTiPx
 
             cb.Checked += (s, ev) =>
             {
+                // Mark ping tab as changed
+                if (!EventsSuspended) _pingTabHasChanges = true;
+
                 // during load operations we suppress validations
                 if (EventsSuspended) return;
                 // validate on check
@@ -1802,6 +1853,12 @@ namespace neTiPx
                     MessageBox.Show("Ungültige IP-Adresse oder Hostname.");
                     cb.IsChecked = false;
                 }
+            };
+
+            cb.Unchecked += (s, ev) =>
+            {
+                // Mark ping tab as changed
+                if (!EventsSuspended) _pingTabHasChanges = true;
             };
 
             btnReset.Click += (s, ev) =>
@@ -1817,6 +1874,9 @@ namespace neTiPx
 
             btnDelete.Click += (s, ev) =>
             {
+                // Mark ping tab as changed
+                _pingTabHasChanges = true;
+
                 try { data.Timer?.Stop(); } catch { }
                 try { if (data.RowPanel != null) (this.FindName("PingEntriesPanel") as StackPanel)?.Children.Remove(data.RowPanel); } catch { }
                 _pingEntries.Remove(data);
@@ -1935,6 +1995,9 @@ namespace neTiPx
         {
             if (EventsSuspended) return;
 
+            // Mark ping tab as changed
+            _pingTabHasChanges = true;
+
             if (this.FindName("ChkPingBackground") is CheckBox chk)
             {
                 _keepPingTimersRunning = chk.IsChecked == true;
@@ -1984,6 +2047,9 @@ namespace neTiPx
                 MessageBox.Show($"Maximal {MaxPingEntries} Ping-Einträge erlaubt.");
                 return;
             }
+            // Mark ping tab as changed
+            _pingTabHasChanges = true;
+
             var p = new PingEntryData();
             _pingEntries.Add(p);
             CreatePingRow(p, _pingEntries.Count - 1);
@@ -1992,6 +2058,9 @@ namespace neTiPx
         private void BtnRemovePingEntry_Click(object sender, RoutedEventArgs e)
         {
             if (_pingEntries.Count == 0) return;
+            // Mark ping tab as changed
+            _pingTabHasChanges = true;
+
             // remove last entry
             var last = _pingEntries[_pingEntries.Count - 1];
             try { last.Timer?.Stop(); } catch { }
