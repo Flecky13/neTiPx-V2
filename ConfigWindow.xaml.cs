@@ -174,6 +174,9 @@ namespace neTiPx
             {
                 ExitSuspendEvents();
             }
+
+            // Restore last selected IP tab AFTER events are enabled
+            Dispatcher.BeginInvoke(new Action(() => RestoreLastSelectedIpTabName()), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
 
@@ -719,6 +722,16 @@ namespace neTiPx
                 // Reset ping tab changes flag
                 _pingTabHasChanges = false;
 
+                // Save the currently selected IP tab position
+                if (IpTabsControl?.SelectedItem is TabItem selectedTab)
+                {
+                    var selectedData = _ipTabs.FirstOrDefault(t => t.Tab == selectedTab);
+                    if (selectedData != null)
+                    {
+                        SaveLastSelectedIpTabName(selectedData);
+                    }
+                }
+
                 // If opened from MainWindow, refresh its display immediately
                 try
                 {
@@ -782,6 +795,16 @@ namespace neTiPx
                         }
                         _adapterTabHasChanges = false;
                         _pingTabHasChanges = false;
+
+                        // Save the currently selected IP tab position
+                        if (IpTabsControl?.SelectedItem is TabItem selectedTab)
+                        {
+                            var selectedData = _ipTabs.FirstOrDefault(t => t.Tab == selectedTab);
+                            if (selectedData != null)
+                            {
+                                SaveLastSelectedIpTabName(selectedData);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -3057,6 +3080,93 @@ namespace neTiPx
             {
                 Trace.WriteLine($"[WiFi] Fehler beim Öffnen des Detail-Fensters: {ex.Message}");
                 MessageBox.Show($"Fehler beim Anzeigen der Details: {ex.Message}", "Fehler", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Speichert den Index des aktuell ausgewählten IP-Tabs in der INI-Datei.
+        /// </summary>
+        private void SaveLastSelectedIpTabName(IpTabData data)
+        {
+            try
+            {
+                // Finde die Position dieses Tabs im TabControl
+                int tabIndex = -1;
+                if (IpTabsControl != null)
+                {
+                    for (int i = 0; i < IpTabsControl.Items.Count; i++)
+                    {
+                        if (IpTabsControl.Items[i] == data.Tab)
+                        {
+                            tabIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (tabIndex >= 0)
+                {
+                    var iniPath = ConfigFileHelper.GetConfigIniPath();
+                    var values = ReadIniToDict(iniPath);
+
+                    // Speichere die Position (0-basiert) des aktuellen Tabs
+                    values["LastSelectedIpTabPosition"] = tabIndex.ToString();
+
+                    // Schreibe zurück
+                    WriteDictToIni(iniPath, values);
+
+                    Debug.WriteLine($"[ConfigWindow] Gespeichert: LastSelectedIpTabPosition = {tabIndex}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ConfigWindow] Fehler beim Speichern des IP-Tabs: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Stellt den zuletzt ausgewählten IP-Tab wieder her und wählt ihn aus.
+        /// </summary>
+        private void RestoreLastSelectedIpTabName()
+        {
+            try
+            {
+                if (IpTabsControl == null || _ipTabs.Count == 0)
+                {
+                    Debug.WriteLine("[ConfigWindow] IpTabsControl oder _ipTabs ist leer");
+                    return;
+                }
+
+                var iniPath = ConfigFileHelper.GetConfigIniPath();
+                var values = ReadIniToDict(iniPath);
+
+                if (values.TryGetValue("LastSelectedIpTabPosition", out var posStr) && int.TryParse(posStr, out var position))
+                {
+                    Debug.WriteLine($"[ConfigWindow] Versuche, Tab an Position {position} wiederherzustellen");
+
+                    // Wähle den Tab an dieser Position
+                    if (position >= 0 && position < IpTabsControl.Items.Count)
+                    {
+                        IpTabsControl.SelectedIndex = position;
+                        Debug.WriteLine($"[ConfigWindow] IP-Tab an Position {position} wiederhergestellt");
+                        return;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[ConfigWindow] Position {position} ist außerhalb des Bereichs (Tabs: {IpTabsControl.Items.Count})");
+                    }
+                }
+
+                // Fallback: Wähle ersten Tab
+                if (IpTabsControl.Items.Count > 0)
+                {
+                    IpTabsControl.SelectedIndex = 0;
+                    Debug.WriteLine("[ConfigWindow] Fallback: Erster IP-Tab ausgewählt");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ConfigWindow] Fehler beim Wiederherstellen des IP-Tabs: {ex.Message}");
             }
         }
     }

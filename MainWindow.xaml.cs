@@ -141,7 +141,7 @@ namespace neTiPx
                 Debug.WriteLine($"[MainWindow] Show unterdrückt bis {_suppressShowUntil}");
                 return;
             }
-            Dispatcher.Invoke(async () =>
+            Dispatcher.Invoke(() =>
             {
                 // Wenn das Fenster vorher verborgen war, zeigen
                 try
