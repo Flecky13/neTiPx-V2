@@ -311,7 +311,7 @@ namespace neTiPx
 
         private void ShowItemOnClick(object? sender, EventArgs args)
         {
-            try { RaiseEventSafely(ShowSelectedEvent); }
+            try { RaiseEventSafely(IpSettingsSelectedEvent); }
             catch { }
         }
 

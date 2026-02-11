@@ -11,6 +11,7 @@
 *.userosscache
 *.sln.docstates
 *.env
+[Dd]esktop.ini
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
