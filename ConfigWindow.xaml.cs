@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Diagnostics;
@@ -67,6 +68,10 @@ namespace neTiPx
         // Dynamic IP tabs
         private const int MaxIpTabs = 10;
         private readonly List<IpTabData> _ipTabs = new List<IpTabData>();
+
+        // Drag & Drop support for reordering tabs
+        private TabItem? _draggedTab = null;
+        private Point _dragStartPoint;
 
         // Ping tools
         private const int MaxPingEntries = 10;
@@ -1304,7 +1309,98 @@ namespace neTiPx
                 tab.Header = newName;
             };
 
+            // Enable Drag & Drop for tab reordering
+            SetupTabDragDrop(tab);
+
             return data;
+        }
+
+        private void SetupTabDragDrop(TabItem tab)
+        {
+            tab.AllowDrop = true;
+            tab.PreviewMouseLeftButtonDown += TabItem_PreviewMouseLeftButtonDown;
+            tab.PreviewMouseMove += TabItem_PreviewMouseMove;
+            tab.DragOver += TabItem_DragOver;
+            tab.Drop += TabItem_Drop;
+        }
+
+        private void TabItem_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is TabItem tabItem)
+            {
+                _dragStartPoint = e.GetPosition(null);
+            }
+        }
+
+        private void TabItem_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && sender is TabItem tabItem)
+            {
+                Point mousePos = e.GetPosition(null);
+                Vector diff = _dragStartPoint - mousePos;
+
+                // Start drag if moved enough
+                if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                    Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+                {
+                    _draggedTab = tabItem;
+                    DragDrop.DoDragDrop(tabItem, tabItem, DragDropEffects.Move);
+                    _draggedTab = null;
+                }
+            }
+        }
+
+        private void TabItem_DragOver(object sender, DragEventArgs e)
+        {
+            if (_draggedTab != null && sender is TabItem targetTab && _draggedTab != targetTab)
+            {
+                e.Effects = DragDropEffects.Move;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+            e.Handled = true;
+        }
+
+        private void TabItem_Drop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                if (_draggedTab != null && sender is TabItem targetTab && _draggedTab != targetTab && IpTabsControl != null)
+                {
+                    // Find positions
+                    int draggedIndex = IpTabsControl.Items.IndexOf(_draggedTab);
+                    int targetIndex = IpTabsControl.Items.IndexOf(targetTab);
+
+                    if (draggedIndex >= 0 && targetIndex >= 0)
+                    {
+                        // Reorder in TabControl
+                        IpTabsControl.Items.RemoveAt(draggedIndex);
+                        IpTabsControl.Items.Insert(targetIndex, _draggedTab);
+
+                        // Reorder in _ipTabs list
+                        var draggedData = _ipTabs.FirstOrDefault(t => t.Tab == _draggedTab);
+                        if (draggedData != null)
+                        {
+                            _ipTabs.Remove(draggedData);
+                            _ipTabs.Insert(targetIndex, draggedData);
+                        }
+
+                        // Select the moved tab
+                        IpTabsControl.SelectedItem = _draggedTab;
+
+                        // Mark as changed
+                        MarkIpTabAsChanged(draggedData ?? new IpTabData());
+
+                        Debug.WriteLine($"[ConfigWindow] Tab von Position {draggedIndex} nach {targetIndex} verschoben");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ConfigWindow] Fehler beim Drag & Drop: {ex.Message}");
+            }
         }
 
         private void SetIpFieldsEnabledForTab(IpTabData data, bool enabled)
