@@ -60,6 +60,7 @@ namespace neTiPx
         private int _suspendEventCount = 0;
         private bool _adapterTabHasChanges = false;
         private bool _pingTabHasChanges = false;
+        private bool _allowCloseWithErrors = false;
 
         private bool EventsSuspended => _suspendEventCount > 0;
         private void EnterSuspendEvents() => _suspendEventCount++;
@@ -72,6 +73,7 @@ namespace neTiPx
         // Drag & Drop support for reordering tabs
         private TabItem? _draggedTab = null;
         private Point _dragStartPoint;
+
 
         // Ping tools
         private const int MaxPingEntries = 10;
@@ -98,9 +100,12 @@ namespace neTiPx
 
         private class IpAddressEntry
         {
+            public IpTabData? OwnerTab;
             public TextBox? TxtIP;
             public TextBox? TxtSubnet;
             public Button? BtnRemove;
+            public Button? BtnUp;
+            public Button? BtnDown;
             public Grid? RowPanel;
         }
 
@@ -696,6 +701,11 @@ namespace neTiPx
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
+            if (HasValidationErrors())
+            {
+                MessageBox.Show("Es liegen Fehler in den IP-Adressen vor. Speichern ist aktuell nicht moeglich.");
+                return;
+            }
             var selected = _checkboxes.Where(c => c.IsChecked == true).Select(c => c.Tag?.ToString()).Where(s => !string.IsNullOrEmpty(s)).ToList();
 
             try
@@ -760,6 +770,22 @@ namespace neTiPx
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            if (HasValidationErrors())
+            {
+                var result = MessageBox.Show(
+                    "Es liegen Fehler in den IP-Adressen vor.\n\nOhne Speichern schliessen?",
+                    "Fehler vorhanden",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    _allowCloseWithErrors = true;
+                    this.Close();
+                }
+                return;
+            }
+
             // Check if any IP tab has changes or adapter tab has changes or ping tab has changes
             bool hasIpChanges = _ipTabs.Any(t => t.Tab?.Header?.ToString()?.Contains("*") == true) || _ipTabs.Any(t => t.HasChanges);
             bool hasAdapterChanges = _adapterTabHasChanges;
@@ -1148,9 +1174,45 @@ namespace neTiPx
 
             // Wire events
             cbAdapter.SelectionChanged += (s, e) => { if (!EventsSuspended) { MarkIpTabAsChanged(data); if (rbManual.IsChecked == true) { LoadSystemValuesIntoTab(data); } else if (rbDhcp.IsChecked == true) { LoadSystemValuesIntoTab(data); } } };
-            rbDhcp.Checked += (s, e) => { if (!EventsSuspended) { MarkIpTabAsChanged(data); SetIpFieldsEnabledForTab(data, false); btnAddIp.IsEnabled = false; LoadSystemValuesIntoTab(data); } };
-            rbManual.Checked += (s, e) => { if (!EventsSuspended) { MarkIpTabAsChanged(data); SetIpFieldsEnabledForTab(data, true); btnAddIp.IsEnabled = true; LoadSystemValuesIntoTab(data); } };
-            btnAddIp.Click += (s, e) => { MarkIpTabAsChanged(data); AddIpEntryToTab(data); };
+            rbDhcp.Checked += (s, e) =>
+            {
+                if (!EventsSuspended)
+                {
+                    MarkIpTabAsChanged(data);
+                    SetIpFieldsEnabledForTab(data, false);
+                    btnAddIp.IsEnabled = false;
+                    LoadSystemValuesIntoTab(data);
+                    UpdateIpEntryValidationForTab(data);
+                    UpdateSaveApplyButtonsState();
+                }
+            };
+            rbManual.Checked += (s, e) =>
+            {
+                if (!EventsSuspended)
+                {
+                    MarkIpTabAsChanged(data);
+                    SetIpFieldsEnabledForTab(data, true);
+                    btnAddIp.IsEnabled = true;
+                    LoadSystemValuesIntoTab(data);
+                    UpdateIpEntryValidationForTab(data);
+                    UpdateSaveApplyButtonsState();
+                }
+            };
+            btnAddIp.Click += (s, e) =>
+            {
+                if (data.IpEntries != null && data.IpEntries.Count > 0)
+                {
+                    var lastEntry = data.IpEntries[data.IpEntries.Count - 1];
+                    if (!TryValidateIpEntry(lastEntry, allowEmpty: false, out var errorMsg))
+                    {
+                        MessageBox.Show(errorMsg);
+                        return;
+                    }
+                }
+                MarkIpTabAsChanged(data);
+                AddIpEntryToTab(data);
+                UpdateSaveApplyButtonsState();
+            };
             txtName.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
             txtGw.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
             txtDns.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
@@ -1416,6 +1478,8 @@ namespace neTiPx
                     if (entry.TxtIP != null) entry.TxtIP.IsEnabled = enabled;
                     if (entry.TxtSubnet != null) entry.TxtSubnet.IsEnabled = enabled;
                     if (entry.BtnRemove != null) entry.BtnRemove.IsEnabled = enabled;
+                    if (entry.BtnUp != null) entry.BtnUp.IsEnabled = enabled;
+                    if (entry.BtnDown != null) entry.BtnDown.IsEnabled = enabled;
                 }
             }
         }
@@ -1464,6 +1528,7 @@ namespace neTiPx
             if (data == null || data.IpEntriesPanel == null) return;
 
             var entry = new IpAddressEntry();
+            entry.OwnerTab = data;
 
             // Create row grid
             var rowGrid = new Grid { Margin = new Thickness(0, 0, 0, 6) };
@@ -1483,10 +1548,16 @@ namespace neTiPx
             Grid.SetColumn(txtSubnet, 1);
             rowGrid.Children.Add(txtSubnet);
 
-            // Remove Button
-            var btnRemove = new Button { Content = "✕", Width = 32, Height = 28 };
-            Grid.SetColumn(btnRemove, 2);
-            rowGrid.Children.Add(btnRemove);
+            // Action buttons: remove + move up/down
+            var actionPanel = new StackPanel { Orientation = Orientation.Horizontal };
+            var btnRemove = new Button { Content = "X", Width = 32, Height = 28 };
+            var btnUp = new Button { Content = "▲", Width = 32, Height = 28, Margin = new Thickness(4, 0, 0, 0) };
+            var btnDown = new Button { Content = "▼", Width = 32, Height = 28, Margin = new Thickness(4, 0, 0, 0) };
+            actionPanel.Children.Add(btnRemove);
+            actionPanel.Children.Add(btnUp);
+            actionPanel.Children.Add(btnDown);
+            Grid.SetColumn(actionPanel, 2);
+            rowGrid.Children.Add(actionPanel);
 
             // Remove button click handler
             btnRemove.Click += (s, e) =>
@@ -1494,25 +1565,190 @@ namespace neTiPx
                 MarkIpTabAsChanged(data);
                 data.IpEntriesPanel.Children.Remove(rowGrid);
                 data.IpEntries.Remove(entry);
+                UpdateIpEntryMoveButtons(data);
+                UpdateSaveApplyButtonsState();
+            };
+
+            btnUp.Click += (s, e) =>
+            {
+                var fromIndex = data.IpEntries.IndexOf(entry);
+                if (fromIndex <= 0) return;
+
+                data.IpEntries.RemoveAt(fromIndex);
+                data.IpEntries.Insert(fromIndex - 1, entry);
+
+                if (entry.RowPanel != null)
+                {
+                    data.IpEntriesPanel.Children.Remove(entry.RowPanel);
+                    data.IpEntriesPanel.Children.Insert(fromIndex - 1, entry.RowPanel);
+                }
+
+                MarkIpTabAsChanged(data);
+                UpdateIpEntryMoveButtons(data);
+                UpdateSaveApplyButtonsState();
+            };
+
+            btnDown.Click += (s, e) =>
+            {
+                var fromIndex = data.IpEntries.IndexOf(entry);
+                if (fromIndex < 0 || fromIndex >= data.IpEntries.Count - 1) return;
+
+                data.IpEntries.RemoveAt(fromIndex);
+                data.IpEntries.Insert(fromIndex + 1, entry);
+
+                if (entry.RowPanel != null)
+                {
+                    data.IpEntriesPanel.Children.Remove(entry.RowPanel);
+                    data.IpEntriesPanel.Children.Insert(fromIndex + 1, entry.RowPanel);
+                }
+
+                MarkIpTabAsChanged(data);
+                UpdateIpEntryMoveButtons(data);
+                UpdateSaveApplyButtonsState();
             };
 
             // Add change tracking for IP and Subnet fields
-            txtIP.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
-            txtSubnet.TextChanged += (s, e) => { if (!EventsSuspended) MarkIpTabAsChanged(data); };
+            txtIP.TextChanged += (s, e) =>
+            {
+                if (!EventsSuspended) MarkIpTabAsChanged(data);
+                ApplyIpEntryValidation(entry);
+                UpdateSaveApplyButtonsState();
+            };
+            txtSubnet.TextChanged += (s, e) =>
+            {
+                if (!EventsSuspended) MarkIpTabAsChanged(data);
+                ApplyIpEntryValidation(entry);
+                UpdateSaveApplyButtonsState();
+            };
 
             // Add to panel
             data.IpEntriesPanel.Children.Add(rowGrid);
             entry.TxtIP = txtIP;
             entry.TxtSubnet = txtSubnet;
             entry.BtnRemove = btnRemove;
+            entry.BtnUp = btnUp;
+            entry.BtnDown = btnDown;
             entry.RowPanel = rowGrid;
 
             data.IpEntries.Add(entry);
+
+            UpdateIpEntryMoveButtons(data);
 
             // Apply current enabled state
             txtIP.IsEnabled = data.RbManual?.IsChecked ?? false;
             txtSubnet.IsEnabled = data.RbManual?.IsChecked ?? false;
             btnRemove.IsEnabled = data.RbManual?.IsChecked ?? false;
+            btnUp.IsEnabled = data.RbManual?.IsChecked ?? false;
+            btnDown.IsEnabled = data.RbManual?.IsChecked ?? false;
+
+            ApplyIpEntryValidation(entry);
+            UpdateSaveApplyButtonsState();
+        }
+
+        private void UpdateIpEntryMoveButtons(IpTabData data)
+        {
+            if (data.IpEntries == null || data.IpEntries.Count == 0) return;
+
+            int count = data.IpEntries.Count;
+            for (int i = 0; i < count; i++)
+            {
+                var entry = data.IpEntries[i];
+                if (entry.BtnUp == null || entry.BtnDown == null) continue;
+
+                if (count == 1)
+                {
+                    entry.BtnUp.IsEnabled = false;
+                    entry.BtnDown.IsEnabled = false;
+                    entry.BtnUp.Content = "";
+                    entry.BtnDown.Content = "";
+                }
+                else if (i == 0)
+                {
+                    entry.BtnUp.IsEnabled = false;
+                    entry.BtnDown.IsEnabled = true;
+                    entry.BtnUp.Content = "";
+                    entry.BtnDown.Content = "▼";
+                }
+                else if (i == count - 1)
+                {
+                    entry.BtnUp.IsEnabled = true;
+                    entry.BtnDown.IsEnabled = false;
+                    entry.BtnUp.Content = "▲";
+                    entry.BtnDown.Content = "";
+                }
+                else
+                {
+                    entry.BtnUp.IsEnabled = true;
+                    entry.BtnDown.IsEnabled = true;
+                    entry.BtnUp.Content = "▲";
+                    entry.BtnDown.Content = "▼";
+                }
+            }
+        }
+
+        private void ApplyIpEntryValidation(IpAddressEntry entry)
+        {
+            if (entry.TxtIP == null || entry.TxtSubnet == null) return;
+
+            var ip = entry.TxtIP.Text.Trim();
+            var subnet = entry.TxtSubnet.Text.Trim();
+
+            bool requireFilled = entry.OwnerTab != null && entry.OwnerTab.RbManual != null && entry.OwnerTab.RbManual.IsChecked == true;
+            bool ipValid = requireFilled ? (!string.IsNullOrEmpty(ip) && IsValidIPv4(ip)) : (string.IsNullOrEmpty(ip) || IsValidIPv4(ip));
+            bool subnetValid = requireFilled ? (!string.IsNullOrEmpty(subnet) && IsValidSubnetMask(subnet)) : (string.IsNullOrEmpty(subnet) || IsValidSubnetMask(subnet));
+
+            if (ipValid)
+            {
+                entry.TxtIP.BorderBrush = SystemColors.ControlDarkBrush;
+                entry.TxtIP.BorderThickness = new Thickness(1);
+            }
+            else
+            {
+                entry.TxtIP.BorderBrush = new SolidColorBrush(Color.FromRgb(255, 170, 153));
+                entry.TxtIP.BorderThickness = new Thickness(1.5);
+            }
+
+            if (subnetValid)
+            {
+                entry.TxtSubnet.BorderBrush = SystemColors.ControlDarkBrush;
+                entry.TxtSubnet.BorderThickness = new Thickness(1);
+            }
+            else
+            {
+                entry.TxtSubnet.BorderBrush = new SolidColorBrush(Color.FromRgb(255, 170, 153));
+                entry.TxtSubnet.BorderThickness = new Thickness(1.5);
+            }
+        }
+
+        private void UpdateIpEntryValidationForTab(IpTabData data)
+        {
+            if (data.IpEntries == null) return;
+            foreach (var entry in data.IpEntries)
+            {
+                ApplyIpEntryValidation(entry);
+            }
+        }
+
+        private bool HasValidationErrors()
+        {
+            foreach (var t in _ipTabs)
+            {
+                bool requireFilled = t.RbManual != null && t.RbManual.IsChecked == true;
+                if (!requireFilled) continue;
+
+                foreach (var entry in t.IpEntries)
+                {
+                    if (!IsIpEntryValid(entry, requireFilled: true)) return true;
+                }
+            }
+            return false;
+        }
+
+        private void UpdateSaveApplyButtonsState()
+        {
+            bool hasErrors = HasValidationErrors();
+            if (this.FindName("BtnSave") is Button btnSave) btnSave.IsEnabled = !hasErrors;
+            if (this.FindName("BtnApply") is Button btnApply) btnApply.IsEnabled = !hasErrors;
         }
 
         private void IpAdapterCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -2267,6 +2503,23 @@ namespace neTiPx
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
+            if (HasValidationErrors() && !_allowCloseWithErrors)
+            {
+                var result = MessageBox.Show(
+                    "Es liegen Fehler in den IP-Adressen vor.\n\nOhne Speichern schliessen?",
+                    "Fehler vorhanden",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result != MessageBoxResult.Yes)
+                {
+                    e.Cancel = true;
+                    return;
+                }
+
+                _allowCloseWithErrors = true;
+            }
+
             try { StopAllPingTimers(); } catch { }
             try { StopAllGatewayPingTimers(); } catch { }
             base.OnClosing(e);
@@ -2384,6 +2637,83 @@ namespace neTiPx
             return false;
         }
 
+        private bool IsValidSubnetMask(string subnet)
+        {
+            if (!IsValidIPv4(subnet)) return false;
+            var bytes = System.Net.IPAddress.Parse(subnet).GetAddressBytes();
+            uint mask = ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) | ((uint)bytes[2] << 8) | bytes[3];
+
+            if (mask == 0) return false;
+
+            bool seenZero = false;
+            for (int i = 31; i >= 0; i--)
+            {
+                bool bitSet = (mask & (1u << i)) != 0;
+                if (!bitSet) seenZero = true;
+                else if (seenZero) return false;
+            }
+
+            return true;
+        }
+
+        private bool TryValidateIpEntry(IpAddressEntry entry, bool allowEmpty, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+            var ip = entry.TxtIP?.Text.Trim() ?? string.Empty;
+            var subnet = entry.TxtSubnet?.Text.Trim() ?? string.Empty;
+
+            if (string.IsNullOrEmpty(ip) && string.IsNullOrEmpty(subnet))
+            {
+                if (allowEmpty) return true;
+                errorMessage = "Bitte IP-Adresse und Subnetzmaske angeben, bevor eine neue Zeile hinzugefuegt wird.";
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(ip))
+            {
+                errorMessage = "IP-Adresse ist erforderlich.";
+                return false;
+            }
+            if (!IsValidIPv4(ip))
+            {
+                errorMessage = $"IP-Adresse '{ip}' ist ungueltig.";
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(subnet))
+            {
+                errorMessage = "Subnetzmaske ist erforderlich.";
+                return false;
+            }
+            if (!IsValidSubnetMask(subnet))
+            {
+                errorMessage = $"Subnetzmaske '{subnet}' ist ungueltig.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool IsIpEntryValid(IpAddressEntry entry, bool requireFilled)
+        {
+            var ip = entry.TxtIP?.Text.Trim() ?? string.Empty;
+            var subnet = entry.TxtSubnet?.Text.Trim() ?? string.Empty;
+
+            if (requireFilled)
+            {
+                if (string.IsNullOrEmpty(ip) || string.IsNullOrEmpty(subnet)) return false;
+                if (!IsValidIPv4(ip)) return false;
+                if (!IsValidSubnetMask(subnet)) return false;
+                return true;
+            }
+
+            if (string.IsNullOrEmpty(ip) && string.IsNullOrEmpty(subnet)) return true;
+            if (string.IsNullOrEmpty(ip) || string.IsNullOrEmpty(subnet)) return false;
+            if (!IsValidIPv4(ip)) return false;
+            if (!IsValidSubnetMask(subnet)) return false;
+            return true;
+        }
+
         private (bool valid, string errorMessage) ValidateIpGatewaySubnet(string ip, string subnet, string gateway)
         {
             // Validate IP
@@ -2401,7 +2731,7 @@ namespace neTiPx
             {
                 return (false, "Subnetmaske ist erforderlich.");
             }
-            if (!IsValidIPv4(subnet))
+            if (!IsValidSubnetMask(subnet))
             {
                 return (false, $"Subnetmaske '{subnet}' ist ungültig.");
             }
