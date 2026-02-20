@@ -8,9 +8,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Border Name="Border" 
-                                BorderThickness="1,1,1,0" 
-                                BorderBrush="#CCCCCC" 
+                        <Border Name="Border"
+                                BorderThickness="1,1,1,0"
+                                BorderBrush="#CCCCCC"
                                 Background="White"
                                 CornerRadius="4,4,0,0"
                                 Padding="12,4,12,4"
@@ -35,7 +35,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        
+
         <!-- Gemeinsame Styles für Ping-Header und Zellen -->
         <Style x:Key="PingHeaderText" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="Bold"/>
@@ -255,10 +255,24 @@
             </TabItem>
         </TabControl>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button x:Name="BtnApply" Width="80" Margin="4" Click="BtnApply_Click" Visibility="Collapsed">Anwenden</Button>
-            <Button x:Name="BtnSave" Width="80" Margin="4" Click="BtnSave_Click">Speichern</Button>
-            <Button x:Name="BtnCancel" Width="80" Margin="4" Click="BtnClose_Click">Schliessen</Button>
-        </StackPanel>
+        <!-- Statusleiste und Buttons in einer Zeile -->
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Statusleiste links -->
+            <Border Grid.Column="0" BorderBrush="Transparent" BorderThickness="0,1,0,0" Background="Transparent" Padding="8,4" Margin="0,0,8,0">
+                <TextBlock x:Name="StatusTextBlock" Text="" FontSize="11" Foreground="#555" VerticalAlignment="Center" />
+            </Border>
+
+            <!-- Buttons rechts -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="BtnApply" Width="80" Margin="4" Click="BtnApply_Click" Visibility="Collapsed">Anwenden</Button>
+                <Button x:Name="BtnSave" Width="80" Margin="4" Click="BtnSave_Click">Speichern</Button>
+                <Button x:Name="BtnCancel" Width="80" Margin="4" Click="BtnClose_Click">Schliessen</Button>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

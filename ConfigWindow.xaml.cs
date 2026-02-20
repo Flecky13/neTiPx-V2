@@ -189,6 +189,38 @@ namespace neTiPx
             Dispatcher.BeginInvoke(new Action(() => RestoreLastSelectedIpTabName()), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
+        // Status message display
+        private System.Windows.Threading.DispatcherTimer? _statusTimer;
+
+        private void SetStatusMessage(string message, int autoCloseSeconds = 5)
+        {
+            if (this.FindName("StatusTextBlock") is TextBlock statusTextBlock)
+            {
+                statusTextBlock.Text = message;
+
+                // Clear existing timer
+                _statusTimer?.Stop();
+
+                if (autoCloseSeconds > 0)
+                {
+                    // Create new timer to clear message after specified seconds
+                    _statusTimer = new System.Windows.Threading.DispatcherTimer
+                    {
+                        Interval = TimeSpan.FromSeconds(autoCloseSeconds)
+                    };
+                    _statusTimer.Tick += (s, e) =>
+                    {
+                        if (this.FindName("StatusTextBlock") is TextBlock stb)
+                        {
+                            stb.Text = "";
+                        }
+                        _statusTimer?.Stop();
+                    };
+                    _statusTimer.Start();
+                }
+            }
+        }
+
 
             private async void BtnApply_Click(object sender, RoutedEventArgs e)
             {
@@ -333,7 +365,8 @@ namespace neTiPx
                     }
                     catch { }
 
-                    MessageBox.Show("Einstellungen angewendet.");
+                    // Show success status message
+                    SetStatusMessage("Einstellungen erfolgreich angewendet.", 5);
                 }
                 catch (Exception ex)
                 {
@@ -757,7 +790,8 @@ namespace neTiPx
                 }
                 catch { }
 
-                MessageBox.Show("Konfiguration gespeichert.");
+                // Show success status message
+                SetStatusMessage("Konfiguration erfolgreich gespeichert.", 5);
 
                 // Close the config window after saving
                 //this.Close();
