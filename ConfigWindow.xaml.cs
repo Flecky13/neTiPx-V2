@@ -239,7 +239,7 @@ namespace neTiPx
                         return;
                     }
 
-                    var adapterKey = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+                    var adapterKey = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
                     if (string.IsNullOrEmpty(adapterKey))
                     {
                         MessageBox.Show("Kein Adapter im Tab ausgewählt.");
@@ -248,6 +248,9 @@ namespace neTiPx
 
                     // Find network interface by Name or Description or display
                     var ni = NetworkInterface.GetAllNetworkInterfaces()
+                        .Where(n => n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                        .Where(n => !n.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
+                        .Where(n => n.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
                         .FirstOrDefault(n => string.Equals(n.Name, adapterKey, StringComparison.OrdinalIgnoreCase)
                             || string.Equals(n.Description, adapterKey, StringComparison.OrdinalIgnoreCase)
                             || string.Equals(n.Name + " - " + n.Description, adapterKey, StringComparison.OrdinalIgnoreCase));
@@ -339,7 +342,7 @@ namespace neTiPx
                     foreach (var other in _ipTabs)
                     {
                         if (other == data) continue;
-                        var otherAdapter = (other.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
+                        var otherAdapter = (other.AdapterCombo?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
                         if (!string.IsNullOrEmpty(adapterKey) && string.Equals(adapterKey, otherAdapter, StringComparison.OrdinalIgnoreCase))
                         {
                             try { if (other.Tab != null) other.Tab.Foreground = Brushes.Black; } catch { }
@@ -424,6 +427,8 @@ namespace neTiPx
                 var adapters = NetworkInterface.GetAllNetworkInterfaces()
                     .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                     .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
+                    .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
+                    .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
                     .ToList();
 
                 EnterSuspendEvents();
@@ -1031,6 +1036,28 @@ namespace neTiPx
             try
             {
                 if (IpTabsControl == null) return;
+
+                // Read INI file
+                string iniFilePath = ConfigFileHelper.GetConfigIniPath();
+                var iniValues = ReadIniToDict(iniFilePath);
+
+                // Normalize adapter names in INI (convert old display format to new tag format)
+                foreach (var key in iniValues.Keys.ToList())
+                {
+                    if (key.EndsWith(".Adapter", StringComparison.OrdinalIgnoreCase))
+                    {
+                        iniValues[key] = NormalizeAdapterName(iniValues[key]);
+                    }
+                }
+                // Also normalize Adapter1/Adapter2
+                if (iniValues.TryGetValue("Adapter1", out var a1))
+                {
+                    iniValues["Adapter1"] = NormalizeAdapterName(a1);
+                }
+                if (iniValues.TryGetValue("Adapter2", out var a2))
+                {
+                    iniValues["Adapter2"] = NormalizeAdapterName(a2);
+                }
                 EnterSuspendEvents();
                 try
                 {
@@ -1038,8 +1065,25 @@ namespace neTiPx
                     _ipTabs.Clear();
                     IpTabsControl.Items.Clear();
 
-                    var iniPath = ConfigFileHelper.GetConfigIniPath();
-                    var values = ReadIniToDict(iniPath);
+                    var values = ReadIniToDict(iniFilePath);
+
+                    // Normalize adapter names in values dictionary (convert old display format to new tag format)
+                    foreach (var key in values.Keys.ToList())
+                    {
+                        if (key.EndsWith(".Adapter", StringComparison.OrdinalIgnoreCase))
+                        {
+                            values[key] = NormalizeAdapterName(values[key]);
+                        }
+                    }
+                    // Also normalize Adapter1/Adapter2
+                    if (values.TryGetValue("Adapter1", out var a1x))
+                    {
+                        values["Adapter1"] = NormalizeAdapterName(a1x);
+                    }
+                    if (values.TryGetValue("Adapter2", out var a2x))
+                    {
+                        values["Adapter2"] = NormalizeAdapterName(a2x);
+                    }
 
                     int created = 0;
 
@@ -1086,6 +1130,36 @@ namespace neTiPx
             {
                 MessageBox.Show("Fehler beim Laden der IP-Einstellungen: " + ex.Message);
             }
+        }
+
+        // Helper to convert old display-format adapter names to new tag-format names for backward compatibility
+        private string NormalizeAdapterName(string adapterValue)
+        {
+            if (string.IsNullOrEmpty(adapterValue)) return adapterValue;
+
+            // If it looks like a display string ("Name - Description"), extract the Name part
+            if (adapterValue.Contains(" - "))
+            {
+                var parts = adapterValue.Split(new[] { " - " }, StringSplitOptions.None);
+                if (parts.Length > 0)
+                {
+                    var potentialName = parts[0].Trim();
+                    // Verify this is actually a valid adapter name
+                    var adapters = NetworkInterface.GetAllNetworkInterfaces()
+                        .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                        .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
+                        .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
+                        .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
+                        .ToList();
+
+                    if (adapters.Any(a => a.Name.Equals(potentialName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return potentialName;
+                    }
+                }
+            }
+
+            return adapterValue;
         }
 
         private IpTabData CreateIpTab(int index, Dictionary<string, string> iniValues, string? profileName = null)
@@ -1201,9 +1275,19 @@ namespace neTiPx
                 tab.Style = tabItemStyle;
             }
 
-            // Populate adapters from global INI Adapter1/Adapter2
-            if (iniValues.TryGetValue("Adapter1", out var a1) && !string.IsNullOrEmpty(a1)) cbAdapter.Items.Add(new ComboBoxItem { Content = a1, Tag = a1 });
-            if (iniValues.TryGetValue("Adapter2", out var a2) && !string.IsNullOrEmpty(a2)) cbAdapter.Items.Add(new ComboBoxItem { Content = a2, Tag = a2 });
+            // Populate adapters from all available network adapters (same list as in Adapter tab)
+            var adapters = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
+                .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
+                .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
+                .ToList();
+
+            foreach (var adapter in adapters)
+            {
+                string display = adapter.Name + " - " + adapter.Description;
+                cbAdapter.Items.Add(new ComboBoxItem { Content = display, Tag = adapter.Name });
+            }
             if (cbAdapter.Items.Count > 0) cbAdapter.SelectedIndex = 0;
 
             // Wire events
@@ -1268,9 +1352,23 @@ namespace neTiPx
             {
                 if (iniValues.TryGetValue(profileKey + ".Adapter", out var pa) && !string.IsNullOrEmpty(pa))
                 {
+                    // Normalize old display-format adapter names to new tag-format names
+                    pa = NormalizeAdapterName(pa);
+
                     for (int i = 0; i < cbAdapter.Items.Count; i++)
                     {
-                        if ((cbAdapter.Items[i] as ComboBoxItem)?.Content?.ToString()?.Equals(pa, StringComparison.OrdinalIgnoreCase) == true)
+                        var item = cbAdapter.Items[i] as ComboBoxItem;
+                        var tag = item?.Tag?.ToString() ?? string.Empty;
+
+                        // First priority: exact match on Tag (adapter name)
+                        if (pa.Equals(tag, StringComparison.OrdinalIgnoreCase))
+                        {
+                            cbAdapter.SelectedIndex = i; break;
+                        }
+
+                        // Second priority: exact match in Content (for backward compat)
+                        var content = item?.Content?.ToString() ?? string.Empty;
+                        if (pa.Equals(content, StringComparison.OrdinalIgnoreCase))
                         {
                             cbAdapter.SelectedIndex = i; break;
                         }
@@ -1329,9 +1427,23 @@ namespace neTiPx
                 string prefix = $"IpTab{index}";
                 if (iniValues.TryGetValue(prefix + "Adapter", out var ia) && !string.IsNullOrEmpty(ia))
                 {
+                    // Normalize old display-format adapter names to new tag-format names
+                    ia = NormalizeAdapterName(ia);
+
                     for (int i = 0; i < cbAdapter.Items.Count; i++)
                     {
-                        if ((cbAdapter.Items[i] as ComboBoxItem)?.Content?.ToString()?.Equals(ia, StringComparison.OrdinalIgnoreCase) == true)
+                        var item = cbAdapter.Items[i] as ComboBoxItem;
+                        var tag = item?.Tag?.ToString() ?? string.Empty;
+
+                        // First priority: exact match on Tag (adapter name)
+                        if (ia.Equals(tag, StringComparison.OrdinalIgnoreCase))
+                        {
+                            cbAdapter.SelectedIndex = i; break;
+                        }
+
+                        // Second priority: exact match in Content (for backward compat)
+                        var content = item?.Content?.ToString() ?? string.Empty;
+                        if (ia.Equals(content, StringComparison.OrdinalIgnoreCase))
                         {
                             cbAdapter.SelectedIndex = i; break;
                         }
@@ -1521,7 +1633,7 @@ namespace neTiPx
         private void LoadSystemValuesIntoTab(IpTabData data)
         {
             if (data == null) return;
-            var sel = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+            var sel = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
             if (string.IsNullOrEmpty(sel)) return;
             var sys = GetSystemIpv4Settings(sel);
             if (sys != null)
@@ -1805,7 +1917,11 @@ namespace neTiPx
         {
             try
             {
-                var adapters = NetworkInterface.GetAllNetworkInterfaces();
+                var adapters = NetworkInterface.GetAllNetworkInterfaces()
+                    .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                    .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
+                    .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
+                    .ToList();
                 var ni = adapters.FirstOrDefault(n => string.Equals(n.Name, adapterName, StringComparison.OrdinalIgnoreCase) || string.Equals(n.Description, adapterName, StringComparison.OrdinalIgnoreCase));
                 if (ni == null) return null;
 
@@ -2021,7 +2137,8 @@ namespace neTiPx
                     usedNames.Add(name);
                     profileNames.Add(name);
 
-                    var adapter = (t.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
+                    // Save adapter name (Tag) instead of display string (Content) for stability
+                    var adapter = (t.AdapterCombo?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? string.Empty;
                     values[$"{name}.Adapter"] = adapter;
                     var isManual = (t.RbManual != null && t.RbManual.IsChecked == true);
                     values[$"{name}.Mode"] = isManual ? "Manual" : "DHCP";
@@ -2600,7 +2717,7 @@ namespace neTiPx
                     try
                     {
                         // Always use the current gateway of the selected network interface
-                        var selAdapter = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Content?.ToString();
+                        var selAdapter = (data.AdapterCombo?.SelectedItem as ComboBoxItem)?.Tag?.ToString();
                         string gw = string.Empty;
                         if (!string.IsNullOrEmpty(selAdapter))
                         {
