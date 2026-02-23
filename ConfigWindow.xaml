@@ -138,7 +138,7 @@
                                     <CheckBox x:Name="ChkPingBackground" Margin="10,2,2,2" VerticalAlignment="Center" Checked="ChkPingBackground_Changed" Unchecked="ChkPingBackground_Changed">
                                         <TextBlock Text="Im Hintergrund weiterlaufen" FontWeight="Normal" />
                                     </CheckBox>
-                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(max. 10 • IP oder Hostname • Spaltenbreite mit Maus anpassen)</TextBlock>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(max. 10 • IP oder Hostname)</TextBlock>
                                 </StackPanel>
 
                                 <!-- Resizable column headers -->
@@ -192,7 +192,7 @@
 
                                 <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,8">
                                     <Button x:Name="BtnScanWifi" Width="110" Margin="2" Click="BtnScanWifi_Click">Netzwerke scannen</Button>
-                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(Klick auf Spalten zum Sortieren)</TextBlock>
+                                    <TextBlock VerticalAlignment="Center" Margin="8,0,0,0" Foreground="Gray">(Klick auf Spalten zum Sortieren) - (Doppelklick auf ein Netzwerk für Detail Infos)</TextBlock>
                                 </StackPanel>
 
                                 <DataGrid x:Name="WifiDataGrid" Grid.Row="1"
