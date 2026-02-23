@@ -427,8 +427,6 @@ namespace neTiPx
                 var adapters = NetworkInterface.GetAllNetworkInterfaces()
                     .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                     .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
-                    .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
-                    .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
                     .ToList();
 
                 EnterSuspendEvents();
@@ -1148,8 +1146,6 @@ namespace neTiPx
                     var adapters = NetworkInterface.GetAllNetworkInterfaces()
                         .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                         .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
-                        .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
-                        .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
                         .ToList();
 
                     if (adapters.Any(a => a.Name.Equals(potentialName, StringComparison.OrdinalIgnoreCase)))
@@ -1279,8 +1275,6 @@ namespace neTiPx
             var adapters = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
                 .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
-                .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
-                .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
                 .ToList();
 
             foreach (var adapter in adapters)
@@ -1919,8 +1913,7 @@ namespace neTiPx
             {
                 var adapters = NetworkInterface.GetAllNetworkInterfaces()
                     .Where(a => a.NetworkInterfaceType != NetworkInterfaceType.Loopback)
-                    .Where(a => !a.IsReceiveOnly)  // Exclude receive-only adapters (virtual/phantom)
-                    .Where(a => a.Speed > 0)  // Exclude adapters with no speed (disabled/phantom)
+                    .Where(a => a.GetPhysicalAddress() != null && a.GetPhysicalAddress().GetAddressBytes().Length > 0)
                     .ToList();
                 var ni = adapters.FirstOrDefault(n => string.Equals(n.Name, adapterName, StringComparison.OrdinalIgnoreCase) || string.Equals(n.Description, adapterName, StringComparison.OrdinalIgnoreCase));
                 if (ni == null) return null;
