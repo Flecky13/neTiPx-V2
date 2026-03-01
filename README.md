@@ -1,4 +1,4 @@
-# Kurze Info für die README (GitHub)
+# Projekt ENDE - weiter gehts siehe Link
 ⚠ Projektstatus
 
 Dieses Repository wird nicht mehr weiterentwickelt.
