@@ -1,3 +1,19 @@
+# Kurze Info für die README (GitHub)
+⚠ Projektstatus
+
+Dieses Repository wird nicht mehr weiterentwickelt.
+
+Die neue, vollständig überarbeitete Version von neTiPx (ab Version 1.1.6.0) befindet sich in einem separaten Repository:
+
+➡ [(https://github.com/Flecky13/neTiPx)]
+
+Bitte verwende ausschließlich das neue Repository für aktuelle Releases, Updates und zukünftige Entwicklungen.
+
+
+
+
+
+
 ## neTiPx — Netzwerk-Info Tool (C#)
 
 ![Alt text](Images/APP.png)
