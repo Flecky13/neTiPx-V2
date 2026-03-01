@@ -9,10 +9,8 @@ Die neue, vollständig überarbeitete Version von neTiPx (ab Version 1.1.6.0) be
 
 Bitte verwende ausschließlich das neue Repository für aktuelle Releases, Updates und zukünftige Entwicklungen.
 
-
-
-
-
+##########################################################################################################################
+##########################################################################################################################
 
 ## neTiPx — Netzwerk-Info Tool (C#)
 
